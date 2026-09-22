@@ -1,0 +1,1646 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Magnet.io - Édition Complète & Restaurée</title>
+<script src="/socket.io/socket.io.js"></script>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { width:100%; height:100%; overflow:hidden; background:#05070f; font-family:'Segoe UI', Roboto, sans-serif; color:#fff; user-select:none; }
+  canvas#game { display:block; position:absolute; top:0; left:0; z-index:1; }
+  
+  /* HUD EN JEU */
+  #ui { position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:50; display:none; }
+  .hud-panel { position:absolute; background:rgba(9, 14, 28, 0.90); border:1px solid rgba(255,255,255,0.18); backdrop-filter:blur(10px); border-radius:12px; pointer-events:auto; }
+  
+  #topStats { top:14px; left:16px; display:flex; gap:10px; align-items:center; padding:8px 14px; }
+  .stat-pill { display:flex; align-items:center; gap:6px; font-size:15px; font-weight:800; }
+  #scorePill { color:#06d6a0; }
+  #coinsPill { color:#ffd166; }
+  #roomBadge { padding:5px 10px; border-radius:14px; font-size:11px; font-weight:900; background:rgba(255,209,102,0.18); color:#ffd166; border:1px solid rgba(255,209,102,0.3); }
+  #polarityBadge { padding:5px 12px; border-radius:20px; font-weight:900; font-size:12px; text-transform:uppercase; letter-spacing:1px; transition:0.2s; background:#ff4d6d; }
+  #fpsCounter { font-size:11px; font-weight:800; opacity:0.8; margin-left:2px; }
+
+  .icon-btn { cursor:pointer; font-size:18px; opacity:0.85; transition:0.2s; }
+  .icon-btn:hover { transform:scale(1.15); opacity:1; }
+
+  #xpContainer { display:flex; flex-direction:column; gap:3px; min-width:100px; }
+  .xp-labels { display:flex; justify-content:space-between; font-size:11px; font-weight:800; color:#cbd5e1; }
+  .xp-bar-bg { width:100%; height:7px; background:rgba(255,255,255,0.1); border-radius:10px; overflow:hidden; }
+  .xp-bar-fill { height:100%; width:0%; background:linear-gradient(90deg, #4cc9f0, #06d6a0); transition:width 0.25s ease-out; }
+
+  #brCountdownBanner { position:absolute; top:85px; left:50%; transform:translateX(-50%); background:rgba(255,0,85,0.88); border:2px solid #ffd166; border-radius:30px; padding:8px 24px; font-weight:900; font-size:15px; color:#fff; display:none; box-shadow:0 0 25px rgba(255,0,85,0.5); z-index:110; }
+
+  #activeBoostsPanel { position:absolute; bottom:30px; left:50%; transform:translateX(-50%); display:flex; gap:12px; pointer-events:none; z-index:110; }
+  .boost-card { background:rgba(9, 14, 28, 0.88); border:1.5px solid rgba(255,255,255,0.2); backdrop-filter:blur(10px); border-radius:12px; padding:8px 14px; min-width:150px; display:flex; flex-direction:column; gap:4px; box-shadow:0 8px 25px rgba(0,0,0,0.6); }
+  .boost-title { display:flex; justify-content:space-between; align-items:center; font-size:12px; font-weight:900; }
+  .boost-bar-bg { width:100%; height:6px; background:rgba(255,255,255,0.1); border-radius:6px; overflow:hidden; }
+  .boost-bar-fill { height:100%; width:100%; border-radius:6px; transition:width 0.05s linear; }
+  #speedBoostCard { border-color:#ffd166; }
+  #speedBoostCard .boost-title { color:#ffd166; }
+  #speedBoostCard .boost-bar-fill { background:#ffd166; }
+  #magnetBoostCard { border-color:#00f0ff; }
+  #magnetBoostCard .boost-title { color:#00f0ff; }
+  #magnetBoostCard .boost-bar-fill { background:#00f0ff; }
+
+  #emoteWheel { position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); width:220px; height:220px; border-radius:50%; background:rgba(18,24,43,0.85); backdrop-filter:blur(12px); border:2px solid #ffd166; display:none; pointer-events:auto; z-index:140; box-shadow:0 0 30px rgba(255,209,102,0.4); }
+  .emote-opt { position:absolute; width:48px; height:48px; border-radius:50%; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.25); display:flex; align-items:center; justify-content:center; font-size:24px; cursor:pointer; transition:transform 0.15s, background 0.15s; }
+  .emote-opt:hover { transform:scale(1.25); background:rgba(255,209,102,0.3); }
+
+  #specBanner { position:absolute; top:85px; left:50%; transform:translateX(-50%); background:rgba(18,24,43,0.92); border:1.5px solid #00f0ff; border-radius:24px; padding:6px 18px; display:none; gap:12px; align-items:center; font-weight:800; font-size:13px; z-index:135; pointer-events:auto; box-shadow:0 4px 20px rgba(0,240,255,0.3); }
+
+  #adminHudPanel { position:absolute; top:75px; left:16px; display:none; flex-direction:column; gap:6px; background:rgba(18,0,36,0.88); border:1px solid #c77dff; border-radius:10px; padding:10px; pointer-events:auto; z-index:125; box-shadow:0 0 15px rgba(199,125,255,0.3); }
+  #adminHudPanel h4 { font-size:11px; color:#c77dff; font-weight:900; letter-spacing:1px; margin-bottom:2px; }
+  .admin-btn { background:rgba(255,255,255,0.08); border:1px solid #c77dff; color:#fff; font-size:11px; font-weight:bold; padding:4px 8px; border-radius:6px; cursor:pointer; }
+  .admin-btn:hover { background:#c77dff; color:#111; }
+
+  #board { top:14px; right:16px; width:220px; padding:10px 12px; box-shadow:0 8px 24px rgba(0,0,0,0.5); }
+  #board h3 { font-size:12px; font-weight:900; letter-spacing:1.5px; color:#8da2c0; text-align:center; margin-bottom:8px; border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:4px; }
+  .lb-row { display:flex; align-items:center; justify-content:space-between; padding:3px 0; font-size:12px; font-weight:600; }
+  .lb-left { display:flex; align-items:center; gap:6px; max-width:145px; }
+  .lb-rank { width:18px; height:18px; border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:900; background:rgba(255,255,255,0.08); color:#a0aec0; flex-shrink:0; }
+  .lb-rank-1 { background:#ffd166; color:#111; }
+  .lb-name { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .lb-mass { font-weight:800; color:#cbd5e1; font-size:11px; }
+  .lb-me { color:#ffd166; background:rgba(255, 209, 102, 0.15); border-radius:6px; padding:3px 4px; margin:1px -4px; }
+
+  #mini { position:absolute; bottom:16px; right:16px; border-radius:10px; border:2px solid rgba(255,255,255,.2); background:rgba(5,9,18,0.7); }
+  #hint { position:absolute; bottom:20px; left:20px; font-size:12px; opacity:.75; line-height:1.4; }
+
+  .mobile-ctrl { position:absolute; border-radius:50%; border:3px solid #fff; background:rgba(255,255,255,.22); color:#fff; font-weight:900; pointer-events:auto; display:none; align-items:center; justify-content:center; }
+  #switchBtn { bottom:85px; right:20px; width:68px; height:68px; font-size:24px; }
+  #dashBtn { bottom:165px; right:20px; width:60px; height:60px; font-size:20px; border-color:#ffd166; background:rgba(255,209,102,0.25); color:#ffd166; }
+  #emoteBtnMob { bottom:235px; right:20px; width:50px; height:50px; font-size:18px; border-color:#ff4d6d; }
+
+  #joystickZone { position:absolute; top:0; left:0; width:60%; height:100%; pointer-events:auto; display:none; }
+  #joyBase { position:absolute; width:110px; height:110px; border-radius:50%; background:rgba(255,255,255,0.08); border:2px solid rgba(255,255,255,0.25); transform:translate(-50%, -50%); display:none; pointer-events:none; }
+  #joyStick { position:absolute; width:48px; height:48px; border-radius:50%; background:rgba(255,255,255,0.4); transform:translate(-50%, -50%); pointer-events:none; }
+
+  /* ÉCRANS ET MENUS */
+  .screen { position:absolute; top:0; left:0; width:100%; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; background:rgba(6,9,19,0.88); backdrop-filter:blur(10px); pointer-events:auto; text-align:center; z-index:100; }
+  .screen h1 { font-size:54px; font-weight:900; letter-spacing:3px; margin-bottom:4px; background:linear-gradient(135deg, #ff4d6d, #4cc9f0); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+  .screen p { opacity:.85; margin-bottom:14px; max-width:480px; font-size:14px; }
+
+  .menu-box { position:relative; background:rgba(18,24,43,0.95); border:1px solid rgba(255,255,255,0.18); padding:22px; border-radius:18px; display:flex; flex-direction:column; align-items:center; gap:10px; box-shadow:0 20px 40px rgba(0,0,0,0.6); max-height:92vh; overflow-y:auto; }
+  .menu-box input { font-size:15px; padding:10px 14px; border-radius:10px; border:1px solid rgba(255,255,255,0.2); outline:none; width:100%; text-align:center; background:#0e1322; color:#fff; }
+
+  .modal-overlay { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); backdrop-filter:blur(8px); display:none; align-items:center; justify-content:center; z-index:200; }
+
+  .btn { font-size:14px; padding:11px 20px; border-radius:12px; border:none; cursor:pointer; font-weight:800; transition:all .15s ease-out; display:inline-flex; align-items:center; justify-content:center; gap:6px; }
+  .btn-primary { background:linear-gradient(90deg, #ff4d6d, #4cc9f0); color:#fff; box-shadow:0 4px 15px rgba(255,77,109,0.4); }
+  .btn-friend { background:linear-gradient(90deg, #7209b7, #4cc9f0); color:#fff; }
+  .btn-account { background:linear-gradient(90deg, #06d6a0, #118ab2); color:#fff; }
+  .btn-server { background:linear-gradient(90deg, #3a86ff, #00b4d8); color:#fff; }
+  .btn-br { background:linear-gradient(90deg, #ff0055, #ff5400); color:#fff; box-shadow:0 4px 15px rgba(255,0,85,0.4); }
+  .btn-secondary { background:rgba(255,255,255,0.08); color:#fff; border:1px solid rgba(255,255,255,0.2); }
+  .btn-secondary:hover { background:rgba(255,255,255,0.18); }
+  .btn-copy { background:linear-gradient(90deg, #ffd166, #f77f00); color:#111; font-weight:900; }
+  .btn-danger { background:linear-gradient(90deg, #ef476f, #b5179e); color:#fff; }
+
+  #userProfileBanner { display:flex; align-items:center; justify-content:space-between; width:100%; max-width:390px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:12px; padding:8px 16px; margin-bottom:8px; }
+
+  /* BOUTIQUE 55 SKINS */
+  .shop-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(110px, 1fr)); gap:10px; margin:14px 0; width:100%; max-height:55vh; overflow-y:auto; padding-right:6px; }
+  .shop-item { background:rgba(255,255,255,0.05); border:2px solid rgba(255,255,255,0.12); border-radius:12px; padding:10px 6px; cursor:pointer; text-align:center; transition:transform 0.15s, border-color 0.15s; }
+  .shop-item:hover { transform:translateY(-2px); border-color:#00f0ff; }
+  .shop-item.equipped { border-color:#ffd166; background:rgba(255,209,102,0.14); }
+  .shop-item.special-locked { border-color:#7209b7; background:rgba(114,9,183,0.12); }
+  .shop-preview { width:38px; height:38px; border-radius:50%; margin:0 auto 6px; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:18px; box-shadow:0 4px 10px rgba(0,0,0,0.4); }
+
+  /* AUDIO & TEST */
+  .audio-row { display:flex; align-items:center; justify-content:space-between; width:100%; font-size:13px; font-weight:bold; }
+  .audio-row input[type=range] { width:150px; accent-color:#00f0ff; }
+  .sound-test-grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:6px; width:100%; margin-top:4px; }
+  .sound-test-btn { background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); border-radius:8px; padding:6px; font-size:11px; font-weight:bold; color:#fff; cursor:pointer; }
+  .sound-test-btn:hover { background:rgba(0,240,255,0.25); border-color:#00f0ff; }
+
+  /* VICTOIRE BR */
+  #brWinModal { position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(18,2,30,0.92); backdrop-filter:blur(12px); display:none; flex-direction:column; align-items:center; justify-content:center; z-index:350; }
+  #brWinModal h1 { font-size:46px; font-weight:900; background:linear-gradient(90deg, #ffd166, #ff0055); -webkit-background-clip:text; -webkit-text-fill-color:transparent; text-shadow:0 0 35px rgba(255,209,102,0.6); margin-bottom:4px; }
+
+  #toast { position:fixed; bottom:25px; left:50%; transform:translateX(-50%); background:#06d6a0; color:#0b0e17; font-weight:bold; font-size:14px; padding:8px 18px; border-radius:20px; display:none; z-index:400; box-shadow:0 4px 15px rgba(6,214,160,0.4); }
+</style>
+</head>
+<body>
+
+<canvas id="game"></canvas>
+<div id="toast">Message</div>
+
+<!-- HUD EN JEU -->
+<div id="ui">
+  <div id="topStats" class="hud-panel">
+    <div class="stat-pill" id="scorePill">⭐ <span id="scoreVal">24</span></div>
+    <div class="stat-pill" id="coinsPill">🪙 <span id="coinsVal">0</span></div>
+    
+    <div id="xpContainer">
+      <div class="xp-labels">
+        <span id="hudLvl">NIV. 1</span>
+        <span id="hudXpTxt">0%</span>
+      </div>
+      <div class="xp-bar-bg">
+        <div class="xp-bar-fill" id="hudXpFill"></div>
+      </div>
+    </div>
+
+    <div id="roomBadge">SALON: GLOBAL</div>
+    <div id="polarityBadge">+ POSITIF</div>
+    <div id="fpsCounter">60 FPS</div>
+
+    <div id="openInGameAudioBtn" class="icon-btn" title="Paramètres & Audio">⚙️</div>
+    <div id="copyInGameLinkBtn" class="icon-btn" title="Copier le lien d'invitation">🔗</div>
+    <div id="quitToLobbyBtn" class="icon-btn" title="Quitter la partie" style="color:#ef476f;">🚪</div>
+    <div id="fsToggle" class="icon-btn">⛶</div>
+  </div>
+
+  <div id="brCountdownBanner">⏳ DÉBUT DANS <span id="brTimerTxt">20s</span> (ATTENTE JOUEURS)</div>
+
+  <div id="activeBoostsPanel">
+    <div id="speedBoostCard" class="boost-card" style="display:none;">
+      <div class="boost-title">
+        <span>⚡ SPEED</span>
+        <span id="speedBoostTimerTxt">4.5s</span>
+      </div>
+      <div class="boost-bar-bg">
+        <div id="speedBoostBarFill" class="boost-bar-fill"></div>
+      </div>
+    </div>
+
+    <div id="magnetBoostCard" class="boost-card" style="display:none;">
+      <div class="boost-title">
+        <span>🧲 HYPER AIMANT</span>
+        <span id="magnetBoostTimerTxt">6.0s</span>
+      </div>
+      <div class="boost-bar-bg">
+        <div id="magnetBoostBarFill" class="boost-bar-fill"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROUE D'ÉMOTES -->
+  <div id="emoteWheel">
+    <div class="emote-opt" style="top:12px; left:86px;" data-emote="👑">👑</div>
+    <div class="emote-opt" style="top:50px; right:16px;" data-emote="😎">😎</div>
+    <div class="emote-opt" style="bottom:50px; right:16px;" data-emote="⚡">⚡</div>
+    <div class="emote-opt" style="bottom:12px; left:86px;" data-emote="💀">💀</div>
+    <div class="emote-opt" style="bottom:50px; left:16px;" data-emote="😡">😡</div>
+    <div class="emote-opt" style="top:50px; left:16px;" data-emote="🎉">🎉</div>
+  </div>
+
+  <!-- BANNIÈRE SPECTATEUR -->
+  <div id="specBanner">
+    <span>👁️ SPECTATEUR : <span id="specPlayerName" style="color:#ffd166;">-</span></span>
+    <button id="specNextBtn" class="btn btn-secondary" style="padding:4px 10px; font-size:12px;">SUIVANT ➔</button>
+    <button id="specRespawnBtn" class="btn btn-primary" style="padding:4px 12px; font-size:12px;">REJOUER DIRECT 🚀</button>
+    <button id="specLeaveBtn" class="btn btn-danger" style="padding:4px 10px; font-size:12px;">MENU 🚪</button>
+  </div>
+
+  <!-- CONSOLE ADMIN HUD -->
+  <div id="adminHudPanel">
+    <h4>⚙️ CONSOLE ADMIN</h4>
+    <button class="admin-btn" id="admGive500">+500 Masse</button>
+    <button class="admin-btn" id="admGive2500" style="color:#ffd166;">+2 500 Masse (Manger Vortex)</button>
+    <button class="admin-btn" id="admGiveTitan" style="color:#ff4d6d;">+10 000 Masse (Titan)</button>
+    <button class="admin-btn" id="admTrigger4Corners" style="background:#ffd166; color:#111; font-weight:900;">💥 WIN 4 COINS (WIPE)</button>
+    <button class="admin-btn" id="admGiveCoins">+1 000 🪙 Pièces</button>
+    <button class="admin-btn" id="admMaxLvl">Niveau 100 Max</button>
+  </div>
+  
+  <div id="board" class="hud-panel">
+    <h3 id="boardTitle">CLASSEMENT SALON</h3>
+    <div id="boardList"></div>
+  </div>
+  
+  <canvas id="mini" width="140" height="140"></canvas>
+  <div id="hint">
+    <b>Souris</b> = Diriger • <b>Clic G</b> = Inverser (+/−)<br>
+    <b>Espace</b> = Boost Dash • <b>W</b> = Éjecter masse • <b>E</b> = Émotes
+  </div>
+
+  <div id="joystickZone"></div>
+  <div id="joyBase"><div id="joyStick"></div></div>
+  <button id="switchBtn" class="mobile-ctrl">⇄</button>
+  <button id="dashBtn" class="mobile-ctrl">⚡</button>
+  <button id="emoteBtnMob" class="mobile-ctrl">💬</button>
+</div>
+
+<!-- POPUP DE VICTOIRE BR -->
+<div id="brWinModal">
+  <div class="menu-box" style="width:450px; border:2px solid #ffd166; box-shadow:0 0 50px rgba(255,209,102,0.6);">
+    <div style="font-size:52px;">👑🏆🥇</div>
+    <h1>TOP 1 BATTLE ROYALE !</h1>
+    <p style="font-size:15px; font-weight:bold; color:#00f0ff;">Dernier survivant de l'arène !</p>
+    <p style="opacity:0.85; font-size:13px;">Tu as surmonté la tempête toxique et éliminé tous tes adversaires.</p>
+    
+    <div style="background:rgba(255,209,102,0.18); border:2px dashed #ffd166; border-radius:14px; padding:12px; width:100%; margin:8px 0;">
+      <div style="font-size:12px; color:#ffd166; font-weight:bold;">RÉCOMPENSE VICTOIRE :</div>
+      <div style="font-size:32px; font-weight:900; color:#ffd166;">+5 000 🪙</div>
+    </div>
+
+    <button id="closeBrWinModalBtn" class="btn btn-copy" style="width:100%; padding:12px; font-size:15px;">RETOURNER AU MENU 🏠</button>
+  </div>
+</div>
+
+<!-- MENU PRINCIPAL -->
+<div id="menu" class="screen">
+  <h1>MAGNET.IO</h1>
+  <p>25 entités par arène • Mode Classique, Battle Royale & 55 Skins !</p>
+  
+  <div id="userProfileBanner">
+    <div style="text-align:left;">
+      <div id="bannerName" style="font-weight:bold; font-size:15px; color:#4cc9f0;">Invité</div>
+      <div id="bannerLvl" style="font-size:12px; color:#06d6a0; font-weight:800;">Niveau 1 (0 XP)</div>
+    </div>
+    <div style="font-size:16px; font-weight:bold; color:#ffd166;">
+      <span id="menuCoins">0</span> 🪙
+    </div>
+  </div>
+
+  <div class="menu-box" style="width:390px;">
+    <div id="gearIconCornerBtn" style="position:absolute; top:14px; right:16px; font-size:22px; cursor:pointer; opacity:0.85;" title="Paramètres">⚙️</div>
+
+    <input id="nameInput" maxlength="14" placeholder="Ton pseudo">
+    
+    <button id="joinCurrentServerBtn" class="btn btn-primary" style="width:100%;">JOUER (<span id="currentServerLabel">GLOBAL</span>) 🚀</button>
+    
+    <div style="display:flex; gap:8px; width:100%;">
+      <button id="openServerModalBtn" class="btn btn-server" style="flex:1;">MODE / SALON 🌐</button>
+      <button id="openSettingsModalBtn" class="btn btn-secondary" style="flex:1;">⚙️ PARAMÈTRES</button>
+    </div>
+
+    <div style="display:flex; gap:8px; width:100%;">
+      <button id="openFriendModalBtn" class="btn btn-friend" style="flex:1;">SALON D'AMIS 👥</button>
+      <button id="openShopBtn" class="btn btn-secondary" style="flex:1;">SKINS (55) 🎨</button>
+    </div>
+
+    <button id="openAccountBtn" class="btn btn-account" style="width:100%;">CONNEXION / COMPTE</button>
+  </div>
+</div>
+
+<!-- MODALE BOUTIQUE (55 SKINS RÉELLEMENT DÉCLARÉS) -->
+<div id="shopModal" class="modal-overlay">
+  <div class="menu-box" style="width:550px; max-width:94%;">
+    <h2>BOUTIQUE & PALIERS (55 SKINS)</h2>
+    <div style="color:#ffd166; font-weight:bold; font-size:15px;">Solde : <span id="shopCoins">0</span> 🪙</div>
+    <div class="shop-grid" id="shopGrid"></div>
+    <button id="closeShopBtn" class="btn btn-secondary" style="width:100%;">FERMER</button>
+  </div>
+</div>
+
+<!-- MODALE CONNEXION / CRÉATION DE COMPTE -->
+<div id="accountModal" class="modal-overlay">
+  <div class="menu-box" style="width:390px;">
+    <div style="display:flex; width:100%; gap:8px; margin-bottom:4px;">
+      <button id="tabLoginBtn" class="btn btn-primary" style="flex:1; font-size:13px; padding:8px;">SE CONNECTER</button>
+      <button id="tabRegisterBtn" class="btn btn-secondary" style="flex:1; font-size:13px; padding:8px;">CRÉER UN COMPTE</button>
+    </div>
+
+    <div id="loginView" style="width:100%; display:flex; flex-direction:column; gap:10px;">
+      <p style="font-size:13px; opacity:0.8; margin:0;">Identifiants (Admin : admin / admin)</p>
+      <input id="loginUser" placeholder="Pseudo">
+      <input id="loginPass" type="password" placeholder="Mot de passe">
+      <button id="submitLoginBtn" class="btn btn-account" style="width:100%;">SE CONNECTER 🚀</button>
+    </div>
+
+    <div id="registerView" style="width:100%; display:none; flex-direction:column; gap:10px;">
+      <div style="background:rgba(6,214,160,0.15); border:1px solid #06d6a0; border-radius:10px; padding:6px; width:100%; color:#06d6a0; font-weight:bold; font-size:12px;">
+        🎁 CADEAU : 250 Pièces Gratuites
+      </div>
+      <input id="regUser" placeholder="Pseudo souhaité">
+      <input id="regPass" type="password" placeholder="Mot de passe">
+      <button id="submitRegisterBtn" class="btn btn-primary" style="width:100%;">S'ENREGISTRER (+250 🪙)</button>
+    </div>
+
+    <button id="closeAccountModalBtn" class="btn btn-secondary" style="width:100%; margin-top:4px;">ANNULER</button>
+  </div>
+</div>
+
+<!-- MODALE PARAMÈTRES (AUDIO & HZ) -->
+<div id="settingsModal" class="modal-overlay">
+  <div class="menu-box" style="width:420px; max-width:94%;">
+    <h2>⚙️ PARAMÈTRES</h2>
+    
+    <div style="width:100%; background:rgba(255,255,255,0.05); border-radius:12px; padding:10px; display:flex; justify-content:space-between; align-items:center;">
+      <div style="text-align:left;">
+        <div style="font-size:13px; font-weight:bold;">Fréquence de rafraîchissement</div>
+        <div style="font-size:11px; opacity:0.75;">Taux d'envoi réseau (Hz)</div>
+      </div>
+      <button id="settingsHzBtn" class="btn btn-server" style="padding:6px 12px; font-size:12px;">⚡ 60Hz</button>
+    </div>
+
+    <div style="width:100%; background:rgba(255,255,255,0.05); border-radius:12px; padding:10px; display:flex; flex-direction:column; gap:10px;">
+      <div style="font-size:13px; font-weight:900; color:#00f0ff; text-align:left;">🎧 RÉGLAGES AUDIO</div>
+      
+      <div class="audio-row">
+        <span>Volume Général</span>
+        <input type="range" id="volMaster" min="0" max="1" step="0.05" value="0.8">
+      </div>
+
+      <div class="audio-row">
+        <span>Effets Sonores (SFX)</span>
+        <input type="range" id="volSfx" min="0" max="1" step="0.05" value="0.9">
+      </div>
+
+      <div class="audio-row">
+        <span>Musique Synthwave</span>
+        <input type="range" id="volMusic" min="0" max="1" step="0.05" value="0.5">
+      </div>
+
+      <div style="font-size:12px; font-weight:bold; opacity:0.8; text-align:left; margin-top:4px;">Tester les sons :</div>
+      <div class="sound-test-grid">
+        <button class="sound-test-btn" id="testPop">Pop Orbe</button>
+        <button class="sound-test-btn" id="testDash">Dash</button>
+        <button class="sound-test-btn" id="testBounce">Rebond</button>
+        <button class="sound-test-btn" id="testPowerup">Boost</button>
+        <button class="sound-test-btn" id="testKill">Kill</button>
+        <button class="sound-test-btn" id="testWin">Victoire</button>
+      </div>
+    </div>
+
+    <button id="closeSettingsModalBtn" class="btn btn-secondary" style="width:100%;">ENREGISTRER & FERMER</button>
+  </div>
+</div>
+
+<!-- MODALE CHOIX DU SERVEUR / MODE -->
+<div id="serverModal" class="modal-overlay">
+  <div class="menu-box" style="width:400px;">
+    <h2>CHOIX DU MODE DE JEU</h2>
+    <div style="display:flex; flex-direction:column; gap:8px; width:100%;">
+      <button class="btn btn-secondary server-preset-btn" data-room="GLOBAL" style="justify-content:space-between; padding:12px;">
+        <div style="text-align:left;">
+          <div style="font-weight:bold; font-size:14px;">🌍 GLOBAL (Classique)</div>
+          <div style="font-size:11px; opacity:0.75;">25 joueurs • Matchmaking auto</div>
+        </div>
+        <b style="color:#06d6a0;">ACTIF</b>
+      </button>
+
+      <button class="btn btn-br server-preset-btn" data-room="BATTLE_ROYALE" style="justify-content:space-between; padding:12px;">
+        <div style="text-align:left;">
+          <div style="font-weight:bold; font-size:14px; color:#fff;">👑 BATTLE ROYALE</div>
+          <div style="font-size:11px; opacity:0.75;">Attente 20s • Tempête toxique • TOP 1</div>
+        </div>
+        <b style="color:#ffd166;">JOUER</b>
+      </button>
+    </div>
+    <button id="closeServerModalBtn" class="btn btn-secondary" style="width:100%; margin-top:6px;">RETOUR</button>
+  </div>
+</div>
+
+<!-- MODALE SALON D'AMIS -->
+<div id="friendModal" class="modal-overlay">
+  <div class="menu-box" style="width:380px;">
+    <h2>JOUER ENTRE AMIS</h2>
+    <p style="font-size:13px; opacity:0.8;">Crée un salon privé ou rejoins le code de ton pote.</p>
+    <button id="createRoomBtn" class="btn btn-copy" style="width:100%;">GÉNÉRER UN SALON PRIVÉ 🎲</button>
+    <div style="width:100%; margin-top:4px;">
+      <input id="roomInput" placeholder="CODE DU SALON (ex: AMIS-42)" style="text-transform:uppercase;">
+    </div>
+    <button id="joinRoomBtn" class="btn btn-friend" style="width:100%;">REJOINDRE CE SALON 🚀</button>
+    <button id="closeFriendModalBtn" class="btn btn-secondary" style="width:100%; opacity:0.7;">RETOUR</button>
+  </div>
+</div>
+
+<!-- ÉCRAN DE MORT -->
+<div id="death" class="screen" style="display:none;">
+  <h1 style="color:#ff4d6d;">ÉCRASÉ !</h1>
+  <div class="menu-box" style="width:380px;">
+    <p id="deathKiller" style="font-size:14px; opacity:0.85; margin-bottom:4px;"></p>
+    <div style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1); border-radius:12px; padding:10px; width:100%; display:flex; flex-direction:column; gap:6px;">
+      <div style="display:flex; justify-content:space-between; font-size:13px;"><span>Score final :</span><b id="finalScore" style="color:#06d6a0;">0</b></div>
+      <div style="display:flex; justify-content:space-between; font-size:13px;"><span>Temps survécu :</span><b id="sessionSurvival" style="color:#00f0ff;">0s</b></div>
+      <div style="display:flex; justify-content:space-between; font-size:13px;"><span>Gains pièces :</span><b style="color:#ffd166;">+<span id="sessionCoins">0</span> 🪙</b></div>
+    </div>
+    <button id="againBtn" class="btn btn-primary" style="width:100%;">REJOUER DIRECT</button>
+    <button id="spectateBtn" class="btn btn-friend" style="width:100%;">OBSERVER LA PARTIE 👁️</button>
+    <button id="backMenuBtn" class="btn btn-secondary" style="width:100%;">RETOUR AU LOBBY</button>
+  </div>
+</div>
+
+<script>
+const socket = io();
+
+// ================= MOTEUR AUDIO COMPLET =================
+const Sound = {
+  ctx: null,
+  musicRunning: true,
+  musicGain: null,
+  sfxGain: null,
+  masterGain: null,
+  volMaster: +localStorage.getItem('mag_vol_master') || 0.8,
+  volSfx: +localStorage.getItem('mag_vol_sfx') || 0.9,
+  volMusic: +localStorage.getItem('mag_vol_music') || 0.5,
+
+  init() {
+    if (!this.ctx) {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (AudioCtx) {
+        this.ctx = new AudioCtx();
+        this.masterGain = this.ctx.createGain();
+        this.masterGain.gain.setValueAtTime(this.volMaster, this.ctx.currentTime);
+        this.masterGain.connect(this.ctx.destination);
+
+        this.sfxGain = this.ctx.createGain();
+        this.sfxGain.gain.setValueAtTime(this.volSfx, this.ctx.currentTime);
+        this.sfxGain.connect(this.masterGain);
+
+        this.musicGain = this.ctx.createGain();
+        this.musicGain.gain.setValueAtTime(this.volMusic, this.ctx.currentTime);
+        this.musicGain.connect(this.masterGain);
+        this.initSynthwave();
+      }
+    }
+  },
+
+  getSpatialVolume(worldX, worldY) {
+    if (worldX === undefined || worldY === undefined) return 1.0;
+    const halfW = (canvas.width / 2) / cam.zoom + 250;
+    const halfH = (canvas.height / 2) / cam.zoom + 250;
+    if (Math.abs(worldX - cam.x) > halfW || Math.abs(worldY - cam.y) > halfH) return 0;
+    const dist = Math.hypot(worldX - cam.x, worldY - cam.y);
+    return Math.max(0.1, 1 - (dist / Math.hypot(halfW, halfH)) * 0.7);
+  },
+
+  setMaster(v) { this.volMaster = v; localStorage.setItem('mag_vol_master', v); if (this.masterGain && this.ctx) this.masterGain.gain.setValueAtTime(v, this.ctx.currentTime); },
+  setSfx(v) { this.volSfx = v; localStorage.setItem('mag_vol_sfx', v); if (this.sfxGain && this.ctx) this.sfxGain.gain.setValueAtTime(v, this.ctx.currentTime); },
+  setMusic(v) { this.volMusic = v; localStorage.setItem('mag_vol_music', v); if (this.musicGain && this.ctx) this.musicGain.gain.setValueAtTime(v, this.ctx.currentTime); },
+
+  initSynthwave() {
+    const notes = [65.41, 77.78, 87.31, 98.00];
+    let step = 0;
+    setInterval(() => {
+      if (!this.musicRunning || !this.ctx || this.volMusic <= 0.01) return;
+      const osc = this.ctx.createOscillator(), g = this.ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(notes[step % notes.length], this.ctx.currentTime);
+      g.gain.setValueAtTime(0.12, this.ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.35);
+      osc.connect(g); g.connect(this.musicGain);
+      osc.start(); osc.stop(this.ctx.currentTime + 0.36);
+      step++;
+    }, 420);
+  },
+
+  playPop(gainMult = 1) {
+    this.init();
+    if (!this.ctx || gainMult <= 0) return;
+    const osc = this.ctx.createOscillator(), g = this.ctx.createGain();
+    osc.frequency.setValueAtTime(420, this.ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(850, this.ctx.currentTime + 0.05);
+    g.gain.setValueAtTime(0.08 * gainMult, this.ctx.currentTime);
+    g.gain.linearRampToValueAtTime(0.001, this.ctx.currentTime + 0.05);
+    osc.connect(g); g.connect(this.sfxGain);
+    osc.start(); osc.stop(this.ctx.currentTime + 0.05);
+  },
+
+  playDash(gainMult = 1) {
+    this.init();
+    if (!this.ctx || gainMult <= 0) return;
+    const osc = this.ctx.createOscillator(), g = this.ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(150, this.ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(700, this.ctx.currentTime + 0.2);
+    g.gain.setValueAtTime(0.3 * gainMult, this.ctx.currentTime);
+    g.gain.linearRampToValueAtTime(0.001, this.ctx.currentTime + 0.22);
+    osc.connect(g); g.connect(this.sfxGain);
+    osc.start(); osc.stop(this.ctx.currentTime + 0.22);
+  },
+
+  playBounce(gainMult = 1) {
+    this.init();
+    if (!this.ctx || gainMult <= 0) return;
+    const osc = this.ctx.createOscillator(), g = this.ctx.createGain();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(240, this.ctx.currentTime);
+    osc.frequency.linearRampToValueAtTime(80, this.ctx.currentTime + 0.12);
+    g.gain.setValueAtTime(0.2 * gainMult, this.ctx.currentTime);
+    g.gain.linearRampToValueAtTime(0.001, this.ctx.currentTime + 0.12);
+    osc.connect(g); g.connect(this.sfxGain);
+    osc.start(); osc.stop(this.ctx.currentTime + 0.13);
+  },
+
+  playPowerup(gainMult = 1) {
+    this.init();
+    if (!this.ctx || gainMult <= 0) return;
+    const osc = this.ctx.createOscillator(), g = this.ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(350, this.ctx.currentTime);
+    osc.frequency.linearRampToValueAtTime(880, this.ctx.currentTime + 0.2);
+    g.gain.setValueAtTime(0.25 * gainMult, this.ctx.currentTime);
+    g.gain.linearRampToValueAtTime(0.001, this.ctx.currentTime + 0.22);
+    osc.connect(g); g.connect(this.sfxGain);
+    osc.start(); osc.stop(this.ctx.currentTime + 0.22);
+  },
+
+  playKill(gainMult = 1) {
+    this.init();
+    if (!this.ctx || gainMult <= 0) return;
+    const osc = this.ctx.createOscillator(), g = this.ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(160, this.ctx.currentTime);
+    osc.frequency.linearRampToValueAtTime(40, this.ctx.currentTime + 0.25);
+    g.gain.setValueAtTime(0.28 * gainMult, this.ctx.currentTime);
+    g.gain.linearRampToValueAtTime(0.001, this.ctx.currentTime + 0.25);
+    osc.connect(g); g.connect(this.sfxGain);
+    osc.start(); osc.stop(this.ctx.currentTime + 0.25);
+  },
+
+  playWinFanfare(gainMult = 1) {
+    this.init();
+    if (!this.ctx || gainMult <= 0) return;
+    [261.63, 329.63, 392.00, 523.25, 659.25, 783.99, 1046.50].forEach((freq, idx) => {
+      const osc = this.ctx.createOscillator(), g = this.ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, this.ctx.currentTime + idx * 0.1);
+      g.gain.setValueAtTime(0.3 * gainMult, this.ctx.currentTime + idx * 0.1);
+      g.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + idx * 0.1 + 0.4);
+      osc.connect(g); g.connect(this.sfxGain);
+      osc.start(this.ctx.currentTime + idx * 0.1);
+      osc.stop(this.ctx.currentTime + idx * 0.1 + 0.42);
+    });
+  }
+};
+
+// ================= TABLEAU COMPLET DES 55 SKINS =================
+const SKINS = [
+  { id:'spec_5', name:'Gardien Néon', cost:0, col1:'#00f5d4', col2:'#7b2cbf', reqLevel:5, aura:'neon' },
+  { id:'spec_10', name:'Vortex Quantique', cost:0, col1:'#4361ee', col2:'#f72585', reqLevel:10, aura:'quantum' },
+  { id:'spec_20', name:'Titan Primordial', cost:0, col1:'#ffbe0b', col2:'#fb5607', reqLevel:20, aura:'fire' },
+  { id:'spec_50', name:'Seigneur Obscur', cost:0, col1:'#240046', col2:'#ff0054', reqLevel:50, aura:'dark' },
+  { id:'spec_100', name:'Dieu Infini', cost:0, col1:'#ffffff', col2:'#70e000', reqLevel:100, aura:'god' },
+
+  { id:'classic', name:'Néodyme', cost:0, col1:'#ff4d6d', col2:'#4cc9f0' },
+  { id:'ferrite', name:'Ferrite', cost:50, col1:'#e63946', col2:'#457b9d' },
+  { id:'cobalt', name:'Cobalt', cost:75, col1:'#0077b6', col2:'#ffb703' },
+  { id:'plasma', name:'Plasma', cost:100, col1:'#9d4edd', col2:'#06d6a0' },
+  { id:'cyber', name:'Cyberpunk', cost:150, col1:'#f72585', col2:'#7209b7' },
+  { id:'toxic', name:'Acide Toxique', cost:200, col1:'#38b000', col2:'#9ef01a' },
+  { id:'magma', name:'Magma Pur', cost:250, col1:'#d00000', col2:'#ffba08' },
+  { id:'abysse', name:'Abyssal', cost:300, col1:'#03045e', col2:'#00b4d8' },
+  { id:'foudre', name:'Foudre Bleue', cost:350, col1:'#3a0ca3', col2:'#4cc9f0' },
+  { id:'nature', name:'Émeraude', cost:400, col1:'#2d6a4f', col2:'#52b788' },
+
+  { id:'white_pure', name:'Blanc Polaire', cost:450, col1:'#ffffff', col2:'#d9d9d9' },
+  { id:'white_snow', name:'Flocon Neige', cost:500, col1:'#ffffff', col2:'#74c0fc' },
+  { id:'white_gold', name:'Ivoire Sacré', cost:550, col1:'#fffdf0', col2:'#ffd166' },
+  { id:'white_pearl', name:'Perle Nacre', cost:600, col1:'#f8f9fa', col2:'#e9ecef' },
+  { id:'white_diamond', name:'Diamant Pur', cost:650, col1:'#ffffff', col2:'#bbf2f6' },
+
+  { id:'solar', name:'Soleil Noir', cost:700, col1:'#ffaa00', col2:'#9d0208' },
+  { id:'antimatter', name:'Antimatière', cost:750, col1:'#10002b', col2:'#c77dff' },
+  { id:'void', name:'Néant Profond', cost:800, col1:'#1b1b1b', col2:'#ef233c' },
+  { id:'shadow', name:'Ombre Royale', cost:850, col1:'#240046', col2:'#ff9e00' },
+  { id:'obsidian', name:'Obsidienne', cost:900, col1:'#161a1d', col2:'#e5383b' },
+
+  { id:'synthwave', name:'Synthwave 80s', cost:950, col1:'#ff007f', col2:'#00f5d4' },
+  { id:'vaporwave', name:'Vaporwave', cost:1000, col1:'#ff70a6', col2:'#70d6ff' },
+  { id:'matrix', name:'Matrice Vert', cost:1050, col1:'#00ff41', col2:'#003b00' },
+  { id:'laser', name:'Faisceau Laser', cost:1100, col1:'#ff0054', col2:'#9e0059' },
+  { id:'arcade', name:'Pixel Rétro', cost:1150, col1:'#f15bb5', col2:'#fee440' },
+
+  { id:'ruby', name:'Rubis Sanglant', cost:1200, col1:'#9b2226', col2:'#ae2012' },
+  { id:'sapphire', name:'Saphir Étoilé', cost:1250, col1:'#001219', col2:'#005f73' },
+  { id:'amethyst', name:'Améthyste', cost:1300, col1:'#5a189a', col2:'#7b2cbf' },
+  { id:'topaz', name:'Topaze Impériale', cost:1350, col1:'#ca6702', col2:'#ee9b00' },
+  { id:'quartz', name:'Quartz Rose', cost:1400, col1:'#ffb3c6', col2:'#fb6f92' },
+
+  { id:'pulsar', name:'Pulsar Stellaire', cost:1450, col1:'#480ca8', col2:'#f72585' },
+  { id:'supernova', name:'Supernova', cost:1500, col1:'#ff4800', col2:'#ffb703' },
+  { id:'nebulosa', name:'Nébuleuse Iris', cost:1550, col1:'#7209b7', col2:'#4cc9f0' },
+  { id:'meteor', name:'Météorite', cost:1600, col1:'#6c584c', col2:'#f07167' },
+  { id:'aurora', name:'Aurore Boréale', cost:1650, col1:'#05f140', col2:'#00c2ff' },
+
+  { id:'titanium', name:'Titane Brossé', cost:1700, col1:'#adb5bd', col2:'#495057' },
+  { id:'copper', name:'Cuivre Ancien', cost:1750, col1:'#b08968', col2:'#ddb892' },
+  { id:'bronze', name:'Bronze Antique', cost:1800, col1:'#7f4f24', col2:'#936639' },
+  { id:'silver', name:'Argent Pur', cost:1900, col1:'#e9ecef', col2:'#ced4da' },
+  { id:'gold_classic', name:'Lingot Doré', cost:2000, col1:'#ffb703', col2:'#fb8500' },
+
+  { id:'gold', name:'Or Pur Prestige', cost:2200, col1:'#ffd166', col2:'#ffffff', aura:'gold' },
+  { id:'celestial', name:'Céleste Divin', cost:2400, col1:'#ffffff', col2:'#38b000' },
+  { id:'inferno', name:'Enfer Éternel', cost:2600, col1:'#6a040f', col2:'#f48c06', aura:'fire' },
+  { id:'glitch_god', name:'Glitch Ultime', cost:2800, col1:'#00f0ff', col2:'#ff003c', aura:'glitch' },
+  { id:'black_hole', name:'Trou Noir', cost:3000, col1:'#000000', col2:'#3a0ca3', aura:'dark' },
+  { id:'singularity', name:'Cœur Quantique', cost:3200, col1:'#ff0055', col2:'#00ffff', aura:'quantum' },
+  { id:'spectral', name:'Spectre Spectral', cost:3400, col1:'#ffffff', col2:'#9d4edd' },
+  { id:'radium', name:'Radium Nucléaire', cost:3600, col1:'#70e000', col2:'#007200', aura:'neon' },
+  { id:'cosmic_king', name:'Roi Cosmique', cost:4000, col1:'#ffd166', col2:'#7209b7', aura:'god' },
+  { id:'infinity', name:'Infini Transcendant', cost:5000, col1:'#ffffff', col2:'#000000', aura:'god' }
+];
+
+function isLightColor(hex) {
+  if (!hex || hex.length < 6) return false;
+  let c = hex.replace('#', '');
+  const r = parseInt(c.substr(0,2), 16), g = parseInt(c.substr(2,2), 16), b = parseInt(c.substr(4,2), 16);
+  return (0.299*r + 0.587*g + 0.114*b) > 185;
+}
+
+// ================= GESTION DU PROFIL =================
+function xpForLevel(lvl) { return lvl * 120; }
+
+let playerProfile = {
+  username: localStorage.getItem('mag_username') || '',
+  isAdmin: localStorage.getItem('mag_is_admin') === 'true',
+  hasAccount: localStorage.getItem('mag_has_account') === 'true',
+  coins: +localStorage.getItem('mag_coins') || 0,
+  level: +localStorage.getItem('mag_level') || 1,
+  xp: +localStorage.getItem('mag_xp') || 0,
+  unlockedSkins: JSON.parse(localStorage.getItem('mag_skins') || '["classic"]'),
+  activeSkin: localStorage.getItem('mag_skin_equipped') || 'classic',
+  bestScore: +localStorage.getItem('mag_best') || 0,
+  totalGames: +localStorage.getItem('mag_tot_games') || 0
+};
+
+function saveProfile() {
+  localStorage.setItem('mag_username', playerProfile.username);
+  localStorage.setItem('mag_is_admin', playerProfile.isAdmin);
+  localStorage.setItem('mag_has_account', playerProfile.hasAccount);
+  localStorage.setItem('mag_coins', playerProfile.coins);
+  localStorage.setItem('mag_level', playerProfile.level);
+  localStorage.setItem('mag_xp', playerProfile.xp);
+  localStorage.setItem('mag_skins', JSON.stringify(playerProfile.unlockedSkins));
+  localStorage.setItem('mag_skin_equipped', playerProfile.activeSkin);
+  localStorage.setItem('mag_best', playerProfile.bestScore);
+  localStorage.setItem('mag_tot_games', playerProfile.totalGames);
+  updateStatsDisplay();
+}
+
+function updateStatsDisplay() {
+  document.getElementById('coinsVal').textContent = playerProfile.coins;
+  document.getElementById('menuCoins').textContent = playerProfile.coins;
+  document.getElementById('shopCoins').textContent = playerProfile.coins;
+
+  const req = xpForLevel(playerProfile.level);
+  const pct = Math.min(100, Math.floor((playerProfile.xp / req) * 100));
+  document.getElementById('hudLvl').textContent = `NIV. ${playerProfile.level}`;
+  document.getElementById('hudXpTxt').textContent = `${pct}%`;
+  document.getElementById('hudXpFill').style.width = `${pct}%`;
+  document.getElementById('bannerLvl').textContent = `Niveau ${playerProfile.level} (${playerProfile.xp}/${req} XP)`;
+
+  if (playerProfile.hasAccount) {
+    document.getElementById('bannerName').textContent = playerProfile.username + (playerProfile.isAdmin ? ' [ADMIN]' : '');
+    document.getElementById('openAccountBtn').textContent = "MON COMPTE";
+  } else {
+    document.getElementById('bannerName').textContent = playerProfile.username || "Invité";
+    document.getElementById('openAccountBtn').textContent = "CONNEXION / COMPTE";
+  }
+}
+
+function getActiveSkinData() {
+  return SKINS.find(s => s.id === playerProfile.activeSkin) || SKINS[5];
+}
+
+function renderShop() {
+  const g = document.getElementById('shopGrid');
+  g.innerHTML = '';
+  SKINS.forEach(skin => {
+    const isPalier = !!skin.reqLevel;
+    const isUnlocked = playerProfile.unlockedSkins.includes(skin.id) || (isPalier && playerProfile.level >= skin.reqLevel);
+    const isEquipped = playerProfile.activeSkin === skin.id;
+
+    if (isPalier && playerProfile.level >= skin.reqLevel && !playerProfile.unlockedSkins.includes(skin.id)) {
+      playerProfile.unlockedSkins.push(skin.id);
+      saveProfile();
+    }
+
+    const card = document.createElement('div');
+    card.className = `shop-item ${isEquipped ? 'equipped' : ''} ${isPalier && !isUnlocked ? 'special-locked' : ''}`;
+    
+    let statusTxt = isEquipped ? 'ÉQUIPÉ' : (isUnlocked ? 'UTILISER' : (isPalier ? `🔒 NIV. ${skin.reqLevel}` : `${skin.cost} 🪙`));
+    let statusColor = isEquipped ? '#ffd166' : (isUnlocked ? '#06d6a0' : (isPalier ? '#c77dff' : '#ffd166'));
+
+    card.innerHTML = `
+      <div class="shop-preview" style="background:linear-gradient(45deg, ${skin.col1}, ${skin.col2}); color:#fff;">+</div>
+      <div style="font-weight:bold; font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${skin.name}</div>
+      <div style="font-size:10px; margin-top:2px; font-weight:800; color:${statusColor};">${statusTxt}</div>
+    `;
+
+    card.onclick = () => {
+      if (isUnlocked) {
+        playerProfile.activeSkin = skin.id;
+        saveProfile();
+        renderShop();
+        showToast(`Skin ${skin.name} équipé !`);
+      } else if (isPalier) {
+        alert(`Déblocable au Niveau ${skin.reqLevel} !`);
+      } else if (playerProfile.coins >= skin.cost) {
+        playerProfile.coins -= skin.cost;
+        playerProfile.unlockedSkins.push(skin.id);
+        playerProfile.activeSkin = skin.id;
+        saveProfile();
+        renderShop();
+        showToast(`Skin ${skin.name} acheté !`);
+      } else {
+        alert("Pièces insuffisantes !");
+      }
+    };
+    g.appendChild(card);
+  });
+}
+
+// ================= VARIABLES DU JEU =================
+let state = 'menu';
+let players = {}, parts = [], anomalies = [], powerups = [];
+let myPlayer = null;
+let selectedServerId = 'GLOBAL';
+let currentRoomId = 'GLOBAL';
+let currentTopLeaderId = null;
+
+let isBRMode = false;
+let brState = 'waiting';
+let brTimer = 20;
+let brZone = { x: 1900, y: 1900, radius: 2600 };
+
+let cam = { x: 1900, y: 1900, zoom: 0.85 };
+let mouse = { x: innerWidth / 2, y: innerHeight / 2 };
+let shakeAmount = 0;
+let fxList = [], floatingTexts = [], activeEmotes = [];
+let sessionStartTime = 0;
+let spectatingId = null;
+
+const HZ_MODES = [60, 120, 0];
+let currentHzIdx = +localStorage.getItem('mag_hz_idx') || 0;
+let sendInputInterval = null;
+
+const canvas = document.getElementById('game'), ctx = canvas.getContext('2d');
+const mini = document.getElementById('mini'), mctx = mini.getContext('2d');
+
+function resize() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resize);
+resize();
+
+function radiusOf(p) { return 14 + Math.sqrt(p.mass) * 2.35; }
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  setTimeout(() => { t.style.display = 'none'; }, 2500);
+}
+
+function addFloatingText(x, y, text, color='#fff') {
+  floatingTexts.push({ x, y, text, color, life: 0.85, maxLife: 0.85, vy: -50 });
+}
+
+function spawnBurst(x, y, color, count=14) {
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2, spd = 120 + Math.random() * 240;
+    fxList.push({ x, y, vx: Math.cos(angle)*spd, vy: Math.sin(angle)*spd, color, life: 0.45, maxLife: 0.45, size: 4.5 });
+  }
+}
+
+function returnToLobby() {
+  state = 'menu';
+  myPlayer = null;
+  spectatingId = null;
+  players = {};
+  isBRMode = false;
+  if (sendInputInterval) { clearInterval(sendInputInterval); sendInputInterval = null; }
+  socket.emit('leaveGame');
+  document.getElementById('ui').style.display = 'none';
+  document.getElementById('death').style.display = 'none';
+  document.querySelectorAll('.modal-overlay').forEach(m => m.style.display = 'none');
+  document.getElementById('brWinModal').style.display = 'none';
+  document.getElementById('menu').style.display = 'flex';
+  cam.x = 1900; cam.y = 1900; cam.zoom = 0.85;
+  updateStatsDisplay();
+}
+
+function applyHzRate() {
+  if (sendInputInterval) clearInterval(sendInputInterval);
+  const targetHz = HZ_MODES[currentHzIdx];
+  const rateMs = targetHz === 0 ? (1000 / 144) : (1000 / targetHz);
+  document.getElementById('settingsHzBtn').textContent = targetHz === 0 ? '⚡ MAX' : `⚡ ${targetHz}Hz`;
+
+  sendInputInterval = setInterval(() => {
+    if (state === 'play' && myPlayer && myPlayer.alive) {
+      socket.emit('input', {
+        tx: (mouse.x - canvas.width / 2) / cam.zoom + cam.x,
+        ty: (mouse.y - canvas.height / 2) / cam.zoom + cam.y
+      });
+    }
+  }, rateMs);
+}
+
+// ================= GESTION DES SOCKETS =================
+socket.on('joinedRoom', (data) => {
+  currentRoomId = data.roomId;
+  isBRMode = data.isBR;
+  document.getElementById('roomBadge').textContent = `SALON: ${currentRoomId}`;
+  document.getElementById('adminHudPanel').style.display = data.isAdmin ? 'flex' : 'none';
+  document.getElementById('boardTitle').textContent = isBRMode ? 'SURVIVANTS BR' : 'CLASSEMENT SALON';
+});
+
+socket.on('stateUpdate', (data) => {
+  if (state === 'menu') return;
+  if (data.roomId && data.roomId !== currentRoomId) return;
+
+  parts = data.parts;
+  anomalies = data.anomalies || [];
+  powerups = data.powerups || [];
+  currentTopLeaderId = data.topLeaderId;
+  
+  isBRMode = data.isBR;
+  brState = data.brState;
+  brTimer = data.brTimer;
+  brZone.x = data.brZoneX || 1900;
+  brZone.y = data.brZoneY || 1900;
+  brZone.radius = data.brZoneRadius || 2600;
+
+  const brBanner = document.getElementById('brCountdownBanner');
+  if (isBRMode && brState === 'waiting') {
+    brBanner.style.display = 'block';
+    document.getElementById('brTimerTxt').textContent = `${Math.ceil(brTimer)}s`;
+  } else {
+    brBanner.style.display = 'none';
+  }
+
+  for (const id in data.players) {
+    if (id === socket.id) {
+      if (myPlayer) {
+        myPlayer.mass = data.players[id].mass;
+        myPlayer.cool = data.players[id].cool;
+        myPlayer.pol = data.players[id].pol;
+        myPlayer.speedBoostTimer = data.players[id].speedBoostTimer;
+        myPlayer.magnetBoostTimer = data.players[id].magnetBoostTimer;
+        myPlayer.alive = data.players[id].alive;
+        myPlayer.spawnInvincible = data.players[id].spawnInvincible;
+        myPlayer.x = data.players[id].x;
+        myPlayer.y = data.players[id].y;
+      } else {
+        myPlayer = data.players[id];
+      }
+    } else {
+      players[id] = data.players[id];
+    }
+  }
+
+  for (const id in players) {
+    if (!data.players[id]) delete players[id];
+  }
+  updateUI();
+});
+
+socket.on('eatOrb', (data) => {
+  const g = Sound.getSpatialVolume(data.x, data.y);
+  if (g > 0) Sound.playPop(g);
+});
+
+socket.on('boostPicked', (data) => {
+  Sound.playPowerup(1.0);
+  shakeAmount = 8;
+  addFloatingText(myPlayer ? myPlayer.x : 0, myPlayer ? myPlayer.y - 40 : 0, data.text, data.type === 'speed' ? '#ffd166' : '#00f0ff');
+});
+
+socket.on('playerDashed', (data) => {
+  spawnBurst(data.x, data.y, '#ffd166', 18);
+  const g = Sound.getSpatialVolume(data.x, data.y);
+  if (g > 0) Sound.playDash(g);
+  if (data.id === socket.id) shakeAmount = 10;
+});
+
+socket.on('massEjected', (data) => {
+  const g = Sound.getSpatialVolume(data.x, data.y);
+  if (g > 0) Sound.playPop(g * 0.7);
+});
+
+socket.on('magnetBounce', (data) => {
+  spawnBurst(data.x, data.y, '#ffd166', 20);
+  const g = Sound.getSpatialVolume(data.x, data.y);
+  if (g > 0) { Sound.playBounce(g); shakeAmount = 12 * g; }
+});
+
+socket.on('playerEmoted', (data) => {
+  activeEmotes.push({ playerId: data.id, emote: data.emote, life: 2.2, maxLife: 2.2 });
+});
+
+socket.on('playerKilled', (data) => {
+  spawnBurst(data.x, data.y, '#ff4d6d', 28);
+  const g = Sound.getSpatialVolume(data.x, data.y);
+  if (g > 0) { Sound.playKill(g); shakeAmount = 14 * g; }
+
+  if (data.wasLeader) {
+    addFloatingText(data.x, data.y - 20, '👑 PRIME DU TOP 1 ÉLIMINÉE (+200 🪙) !', '#ffd166');
+    if (data.killerId === socket.id) {
+      playerProfile.coins += 200;
+      saveProfile();
+    }
+  }
+});
+
+socket.on('brMatchStarted', (data) => {
+  showToast(`⚔️ LA BATTLE ROYALE COMMENCE ! (${data.totalAlive} SURVIVANTS)`);
+  Sound.playPowerup(1.0);
+  shakeAmount = 14;
+});
+
+socket.on('brVictory', (data) => {
+  playerProfile.coins += data.rewardCoins;
+  saveProfile();
+  Sound.playWinFanfare(1.0);
+  shakeAmount = 30;
+  document.getElementById('brWinModal').style.display = 'flex';
+});
+
+socket.on('fourCornersWin', (data) => {
+  playerProfile.coins += data.rewardCoins;
+  saveProfile();
+  Sound.playWinFanfare(1.0);
+  shakeAmount = 30;
+});
+
+socket.on('anomalyEaten', (data) => {
+  spawnBurst(data.x, data.y, data.type === 'blackhole' ? '#7209b7' : '#00f5d4', 40);
+  const g = Sound.getSpatialVolume(data.x, data.y);
+  if (g > 0) Sound.playWinFanfare(g * 0.7);
+  shakeAmount = 22;
+  addFloatingText(data.x, data.y, `💥 ${data.eaterName} A ABSORBÉ LE ${data.type === 'blackhole' ? 'TROU NOIR' : 'RÉPULSEUR'} (+1000 MASSE) !`, '#ffd166');
+});
+
+socket.on('blackHoleZap', (data) => {
+  spawnBurst(data.x, data.y, '#7209b7', 16);
+  if (data.id === socket.id) {
+    shakeAmount = 8;
+    addFloatingText(data.x, data.y, '-10% MASSE (TROU NOIR)', '#ff4d6d');
+  }
+});
+
+socket.on('adminMassGift', (data) => {
+  if (data.id === socket.id) {
+    shakeAmount = 6;
+    addFloatingText(myPlayer ? myPlayer.x : 0, myPlayer ? myPlayer.y - 30 : 0, `+${data.added} MASSE (ADMIN)`, '#c77dff');
+  }
+});
+
+socket.on('youDied', (data) => {
+  state = 'dead';
+  const finalS = data.mass || (myPlayer ? Math.floor(myPlayer.mass) : 0);
+  if (finalS > playerProfile.bestScore) playerProfile.bestScore = finalS;
+  const earnedCoins = Math.max(2, Math.floor(finalS * 0.35));
+  playerProfile.coins += earnedCoins;
+  saveProfile();
+
+  document.getElementById('deathKiller').textContent = `Éliminé par ${data.killer}`;
+  document.getElementById('finalScore').textContent = finalS;
+  document.getElementById('sessionSurvival').textContent = `${Math.floor((Date.now() - sessionStartTime) / 1000)}s`;
+  document.getElementById('sessionCoins').textContent = earnedCoins;
+  document.getElementById('brWinModal').style.display = 'none';
+  document.getElementById('specBanner').style.display = 'none';
+  document.getElementById('death').style.display = 'flex';
+});
+
+function joinGameWithRoom(targetRoom) {
+  Sound.init();
+  sessionStartTime = Date.now();
+  const inputName = document.getElementById('nameInput').value.trim();
+  const finalName = inputName || playerProfile.username || 'Invité';
+  playerProfile.username = finalName;
+  playerProfile.totalGames++;
+  saveProfile();
+
+  selectedServerId = targetRoom.toUpperCase();
+  currentRoomId = selectedServerId;
+  document.getElementById('currentServerLabel').textContent = selectedServerId;
+
+  spectatingId = null;
+  myPlayer = null;
+
+  socket.emit('joinGame', {
+    name: finalName,
+    isAdmin: !!playerProfile.isAdmin,
+    skin: getActiveSkinData(),
+    roomId: currentRoomId
+  });
+
+  state = 'play';
+  document.getElementById('menu').style.display = 'none';
+  document.getElementById('death').style.display = 'none';
+  document.querySelectorAll('.modal-overlay').forEach(m => m.style.display = 'none');
+  document.getElementById('ui').style.display = 'block';
+  applyHzRate();
+
+  if ('ontouchstart' in window) {
+    document.getElementById('switchBtn').style.display = 'flex';
+    document.getElementById('dashBtn').style.display = 'flex';
+    document.getElementById('emoteBtnMob').style.display = 'flex';
+    document.getElementById('joystickZone').style.display = 'block';
+  }
+}
+
+// ================= MODALES (BOUTIQUE, COMPTE, PARAMÈTRES) =================
+// Boutique
+document.getElementById('openShopBtn').onclick = () => {
+  renderShop();
+  document.getElementById('shopModal').style.display = 'flex';
+};
+document.getElementById('closeShopBtn').onclick = () => {
+  document.getElementById('shopModal').style.display = 'none';
+};
+
+// Compte
+document.getElementById('openAccountBtn').onclick = () => {
+  document.getElementById('accountModal').style.display = 'flex';
+};
+document.getElementById('closeAccountModalBtn').onclick = () => {
+  document.getElementById('accountModal').style.display = 'none';
+};
+
+const tabLogin = document.getElementById('tabLoginBtn');
+const tabReg = document.getElementById('tabRegisterBtn');
+const loginView = document.getElementById('loginView');
+const regView = document.getElementById('registerView');
+
+tabLogin.onclick = () => {
+  tabLogin.className = 'btn btn-primary';
+  tabReg.className = 'btn btn-secondary';
+  loginView.style.display = 'flex';
+  regView.style.display = 'none';
+};
+
+tabReg.onclick = () => {
+  tabReg.className = 'btn btn-primary';
+  tabLogin.className = 'btn btn-secondary';
+  regView.style.display = 'flex';
+  loginView.style.display = 'none';
+};
+
+document.getElementById('submitLoginBtn').onclick = () => {
+  const u = document.getElementById('loginUser').value.trim();
+  const p = document.getElementById('loginPass').value.trim();
+  if (!u || !p) { alert("Entre ton pseudo et mot de passe."); return; }
+
+  if (u.toLowerCase() === 'admin' && p === 'admin') {
+    playerProfile.username = 'Admin';
+    playerProfile.isAdmin = true;
+    playerProfile.hasAccount = true;
+    playerProfile.coins = Math.max(playerProfile.coins, 10000);
+    playerProfile.level = Math.max(playerProfile.level, 100);
+    saveProfile();
+    document.getElementById('nameInput').value = 'Admin';
+    document.getElementById('accountModal').style.display = 'none';
+    showToast("👑 Connecté en Administrateur !");
+    return;
+  }
+
+  const savedU = localStorage.getItem('mag_saved_user');
+  const savedP = localStorage.getItem('mag_saved_pass');
+  if (savedU && savedU.toLowerCase() === u.toLowerCase() && savedP === p) {
+    playerProfile.username = savedU;
+    playerProfile.isAdmin = false;
+    playerProfile.hasAccount = true;
+    saveProfile();
+    document.getElementById('nameInput').value = savedU;
+    document.getElementById('accountModal').style.display = 'none';
+    showToast(`Bon retour, ${savedU} !`);
+  } else {
+    alert("Identifiants incorrects.");
+  }
+};
+
+document.getElementById('submitRegisterBtn').onclick = () => {
+  const u = document.getElementById('regUser').value.trim();
+  const p = document.getElementById('regPass').value.trim();
+  if (!u || !p) { alert("Remplis tous les champs."); return; }
+
+  localStorage.setItem('mag_saved_user', u);
+  localStorage.setItem('mag_saved_pass', p);
+  playerProfile.username = u;
+  playerProfile.isAdmin = false;
+  playerProfile.hasAccount = true;
+  playerProfile.coins += 250;
+  saveProfile();
+
+  document.getElementById('nameInput').value = u;
+  document.getElementById('accountModal').style.display = 'none';
+  showToast("Compte créé avec succès ! +250 🪙");
+};
+
+// Paramètres
+function openSettings() {
+  Sound.init();
+  document.getElementById('volMaster').value = Sound.volMaster;
+  document.getElementById('volSfx').value = Sound.volSfx;
+  document.getElementById('volMusic').value = Sound.volMusic;
+  document.getElementById('settingsModal').style.display = 'flex';
+}
+
+document.getElementById('gearIconCornerBtn').onclick = openSettings;
+document.getElementById('openSettingsModalBtn').onclick = openSettings;
+document.getElementById('openInGameAudioBtn').onclick = openSettings;
+document.getElementById('closeSettingsModalBtn').onclick = () => {
+  document.getElementById('settingsModal').style.display = 'none';
+};
+
+document.getElementById('settingsHzBtn').onclick = () => {
+  currentHzIdx = (currentHzIdx + 1) % HZ_MODES.length;
+  localStorage.setItem('mag_hz_idx', currentHzIdx);
+  applyHzRate();
+  showToast(HZ_MODES[currentHzIdx] === 0 ? 'Fréquence MAX' : `Fréquence réglée à ${HZ_MODES[currentHzIdx]} Hz`);
+};
+
+document.getElementById('volMaster').oninput = e => Sound.setMaster(+e.target.value);
+document.getElementById('volSfx').oninput = e => Sound.setSfx(+e.target.value);
+document.getElementById('volMusic').oninput = e => Sound.setMusic(+e.target.value);
+
+document.getElementById('testPop').onclick = () => Sound.playPop(1);
+document.getElementById('testDash').onclick = () => Sound.playDash(1);
+document.getElementById('testBounce').onclick = () => Sound.playBounce(1);
+document.getElementById('testPowerup').onclick = () => Sound.playPowerup(1);
+document.getElementById('testKill').onclick = () => Sound.playKill(1);
+document.getElementById('testWin').onclick = () => Sound.playWinFanfare(1);
+
+// Modes et Salons
+document.getElementById('openServerModalBtn').onclick = () => { document.getElementById('serverModal').style.display = 'flex'; };
+document.getElementById('closeServerModalBtn').onclick = () => { document.getElementById('serverModal').style.display = 'none'; };
+document.querySelectorAll('.server-preset-btn').forEach(b => {
+  b.onclick = () => {
+    selectedServerId = b.getAttribute('data-room');
+    document.getElementById('currentServerLabel').textContent = selectedServerId;
+    document.getElementById('serverModal').style.display = 'none';
+    showToast(`Mode choisi : ${selectedServerId}`);
+  };
+});
+
+document.getElementById('openFriendModalBtn').onclick = () => { document.getElementById('friendModal').style.display = 'flex'; };
+document.getElementById('closeFriendModalBtn').onclick = () => { document.getElementById('friendModal').style.display = 'none'; };
+document.getElementById('createRoomBtn').onclick = () => {
+  const code = 'AMIS-' + Math.floor(1000 + Math.random() * 9000);
+  document.getElementById('roomInput').value = code;
+  showToast(`Salon généré : ${code}`);
+};
+document.getElementById('joinRoomBtn').onclick = () => {
+  const r = document.getElementById('roomInput').value.trim() || 'GLOBAL';
+  joinGameWithRoom(r);
+};
+
+// ================= CONTRÔLES DU JEU =================
+window.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
+window.addEventListener('keydown', e => {
+  if (state === 'play') {
+    if (e.code === 'Space' || e.code === 'ShiftLeft') socket.emit('performDash');
+    if (e.code === 'KeyW') socket.emit('ejectMass');
+    if (e.code === 'KeyE') toggleEmoteWheel();
+  }
+});
+canvas.addEventListener('mousedown', e => {
+  if (state === 'play') {
+    if (e.button === 0) socket.emit('togglePol');
+    else if (e.button === 2) socket.emit('performDash');
+  }
+});
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+document.getElementById('joinCurrentServerBtn').onclick = () => joinGameWithRoom(selectedServerId);
+document.getElementById('quitToLobbyBtn').onclick = returnToLobby;
+document.getElementById('backMenuBtn').onclick = returnToLobby;
+document.getElementById('againBtn').onclick = () => joinGameWithRoom(selectedServerId);
+document.getElementById('closeBrWinModalBtn').onclick = returnToLobby;
+
+// Console Admin
+document.getElementById('admGive500').onclick = () => socket.emit('adminGiveMass', { amount: 500 });
+document.getElementById('admGive2500').onclick = () => socket.emit('adminGiveMass', { amount: 2500 });
+document.getElementById('admGiveTitan').onclick = () => socket.emit('adminGiveMass', { amount: 10000 });
+document.getElementById('admTrigger4Corners').onclick = () => socket.emit('adminTriggerFourCorners');
+document.getElementById('admGiveCoins').onclick = () => { playerProfile.coins += 1000; saveProfile(); showToast('+1 000 🪙 ajoutés !'); };
+document.getElementById('admMaxLvl').onclick = () => { playerProfile.level = 100; playerProfile.xp = 0; saveProfile(); showToast('Niveau 100 Max !'); };
+
+// Spectateur
+document.getElementById('spectateBtn').onclick = () => {
+  state = 'spectate';
+  myPlayer = null;
+  document.getElementById('death').style.display = 'none';
+  document.getElementById('ui').style.display = 'block';
+  document.getElementById('specBanner').style.display = 'flex';
+  const live = Object.values(players).filter(p => p.alive);
+  if (live.length > 0) {
+    spectatingId = live[0].id;
+    document.getElementById('specPlayerName').textContent = live[0].name;
+  }
+};
+document.getElementById('specNextBtn').onclick = () => {
+  const live = Object.values(players).filter(p => p.alive);
+  if (live.length === 0) return;
+  const currentIdx = live.findIndex(p => p.id === spectatingId);
+  const nextTarget = live[(currentIdx + 1) % live.length];
+  spectatingId = nextTarget.id;
+  document.getElementById('specPlayerName').textContent = nextTarget.name;
+};
+document.getElementById('specLeaveBtn').onclick = returnToLobby;
+document.getElementById('specRespawnBtn').onclick = () => joinGameWithRoom(selectedServerId);
+
+// Roue d'émotes
+const emoteWheel = document.getElementById('emoteWheel');
+function toggleEmoteWheel() {
+  if (state !== 'play') return;
+  emoteWheel.style.display = (emoteWheel.style.display === 'block') ? 'none' : 'block';
+}
+document.querySelectorAll('.emote-opt').forEach(opt => {
+  opt.onclick = () => {
+    const emote = opt.getAttribute('data-emote');
+    socket.emit('sendEmote', { emote });
+    emoteWheel.style.display = 'none';
+  };
+});
+
+let frameCount = 0, lastFpsTime = performance.now();
+function updateFpsCounter(now) {
+  frameCount++;
+  if (now - lastFpsTime >= 1000) {
+    const fps = Math.round((frameCount * 1000) / (now - lastFpsTime));
+    document.getElementById('fpsCounter').textContent = `${fps} FPS`;
+    frameCount = 0;
+    lastFpsTime = now;
+  }
+}
+
+// ================= BOUCLE PRINCIPALE & RENDU COMPLET =================
+let lastT = performance.now();
+function loop(t) {
+  const dt = Math.min(0.06, (t - lastT) / 1000);
+  lastT = t;
+  updateFpsCounter(t);
+
+  if (shakeAmount > 0) shakeAmount = Math.max(0, shakeAmount - dt * 32);
+
+  if (myPlayer && myPlayer.spawnInvincible > 0) myPlayer.spawnInvincible -= dt;
+  for (const id in players) { if (players[id].spawnInvincible > 0) players[id].spawnInvincible -= dt; }
+
+  if (state === 'play' && myPlayer && myPlayer.alive) {
+    if (myPlayer.speedBoostTimer > 0) myPlayer.speedBoostTimer -= dt;
+    if (myPlayer.magnetBoostTimer > 0) myPlayer.magnetBoostTimer -= dt;
+
+    const tx = (mouse.x - canvas.width / 2) / cam.zoom + cam.x;
+    const ty = (mouse.y - canvas.height / 2) / cam.zoom + cam.y;
+    const dx = tx - myPlayer.x, dy = ty - myPlayer.y;
+    const d = Math.hypot(dx, dy);
+
+    let spd = Math.max(165, 340 / Math.pow(1 + myPlayer.mass / 220, 0.36));
+    if (myPlayer.speedBoostTimer > 0) spd *= 1.85;
+    if (myPlayer.dashActiveTimer > 0) spd *= 2.2;
+
+    let ax = 0, ay = 0;
+    if (d > 8) {
+      const f = Math.min(1, d / 120);
+      ax = (dx / d) * spd * f;
+      ay = (dy / d) * spd * f;
+    }
+
+    const turn = myPlayer.dashActiveTimer > 0 ? 2.2 : Math.max(3.0, 6.2 - Math.sqrt(myPlayer.mass) * 0.04);
+    myPlayer.vx += (ax - myPlayer.vx) * Math.min(1, dt * turn);
+    myPlayer.vy += (ay - myPlayer.vy) * Math.min(1, dt * turn);
+    myPlayer.x += myPlayer.vx * dt;
+    myPlayer.y += myPlayer.vy * dt;
+
+    const r = radiusOf(myPlayer);
+    if (r < 1900) {
+      if (myPlayer.x - r < 0) myPlayer.x = r;
+      if (myPlayer.x + r > 3800) myPlayer.x = 3800 - r;
+      if (myPlayer.y - r < 0) myPlayer.y = r;
+      if (myPlayer.y + r > 3800) myPlayer.y = 3800 - r;
+    }
+  }
+
+  for (let i = activeEmotes.length - 1; i >= 0; i--) {
+    activeEmotes[i].life -= dt;
+    if (activeEmotes[i].life <= 0) activeEmotes.splice(i, 1);
+  }
+  for (let i = fxList.length - 1; i >= 0; i--) {
+    const fx = fxList[i];
+    fx.x += fx.vx * dt; fx.y += fx.vy * dt;
+    fx.life -= dt;
+    if (fx.life <= 0) fxList.splice(i, 1);
+  }
+  for (let i = floatingTexts.length - 1; i >= 0; i--) {
+    const ft = floatingTexts[i];
+    ft.y += ft.vy * dt;
+    ft.life -= dt;
+    if (ft.life <= 0) floatingTexts.splice(i, 1);
+  }
+
+  let targetFollow = (state === 'play' && myPlayer && myPlayer.alive) ? myPlayer : players[spectatingId];
+  if (targetFollow && targetFollow.alive) {
+    cam.x += (targetFollow.x - cam.x) * Math.min(1, dt * 8);
+    cam.y += (targetFollow.y - cam.y) * Math.min(1, dt * 8);
+    const targetZoom = Math.max(0.18, Math.min(1.0, 1.06 - Math.sqrt(targetFollow.mass) / 65));
+    cam.zoom += (targetZoom - cam.zoom) * Math.min(1, dt * 3.5);
+  }
+
+  draw();
+  requestAnimationFrame(loop);
+}
+
+function draw() {
+  const cw = canvas.width, ch = canvas.height;
+  ctx.clearRect(0, 0, cw, ch);
+  ctx.fillStyle = '#060913';
+  ctx.fillRect(0, 0, cw, ch);
+
+  ctx.save();
+  if (shakeAmount > 0) ctx.translate((Math.random() - 0.5) * shakeAmount, (Math.random() - 0.5) * shakeAmount);
+
+  ctx.translate(cw / 2, ch / 2);
+  ctx.scale(cam.zoom, cam.zoom);
+  ctx.translate(-cam.x, -cam.y);
+
+  // Grille
+  ctx.strokeStyle = 'rgba(255,255,255,0.035)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  for (let x = 0; x <= 3800; x += 120) { ctx.moveTo(x, 0); ctx.lineTo(x, 3800); }
+  for (let y = 0; y <= 3800; y += 120) { ctx.moveTo(0, y); ctx.lineTo(3800, y); }
+  ctx.stroke();
+
+  // Bordure d'arène
+  ctx.strokeStyle = '#ff3366';
+  ctx.lineWidth = 6;
+  ctx.strokeRect(0, 0, 3800, 3800);
+
+  // TEMPÊTE TOXIQUE (BATTLE ROYALE)
+  if (isBRMode && brState === 'active') {
+    ctx.save();
+    ctx.strokeStyle = '#ff0055';
+    ctx.lineWidth = 12;
+    ctx.shadowColor = '#ff0055';
+    ctx.shadowBlur = 30;
+    ctx.beginPath();
+    ctx.arc(brZone.x, brZone.y, brZone.radius, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(255, 0, 85, 0.08)';
+    ctx.beginPath();
+    ctx.rect(0, 0, 3800, 3800);
+    ctx.arc(brZone.x, brZone.y, brZone.radius, 0, Math.PI * 2, true);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // ANOMALIES (TROU NOIR / RÉPULSEUR)
+  for (const a of anomalies) {
+    if (!a.alive) continue;
+    ctx.save();
+    ctx.translate(a.x, a.y);
+    const isBH = a.type === 'blackhole';
+    ctx.strokeStyle = isBH ? '#7209b7' : '#00f5d4';
+    ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.arc(0, 0, a.radius, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = isBH ? '#0a0017' : 'rgba(0, 245, 212, 0.22)';
+    ctx.beginPath(); ctx.arc(0, 0, a.radius * 0.45, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 13px sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(isBH ? 'TROU NOIR' : '⚡ RÉPULSEUR', 0, 0);
+    ctx.restore();
+  }
+
+  // POWERUPS (SPEED & HYPER AIMANT)
+  for (const pw of powerups) {
+    if (!pw.alive) continue;
+    ctx.save();
+    ctx.translate(pw.x, pw.y);
+    const isSpeed = pw.type === 'speed';
+    ctx.fillStyle = isSpeed ? 'rgba(255, 209, 102, 0.22)' : 'rgba(0, 240, 255, 0.22)';
+    ctx.beginPath();
+    ctx.arc(0, 0, 28 + Math.sin(Date.now() * 0.008) * 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = isSpeed ? '#ffd166' : '#00f0ff';
+    ctx.beginPath(); ctx.arc(0, 0, 18, 0, Math.PI * 2); ctx.fill();
+
+    ctx.fillStyle = '#111';
+    ctx.font = 'bold 16px sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(isSpeed ? '⚡' : '🧲', 0, 1);
+    ctx.restore();
+  }
+
+  // ORBES MAGNÉTIQUES
+  for (const p of parts) {
+    ctx.fillStyle = p.pol === 1 ? '#ff4d6d' : '#4cc9f0';
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.id && p.id.toString().startsWith('feed_') ? 7 : 4.5, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // JOUEURS ET BOTS
+  const allRender = { ...players };
+  if (myPlayer && myPlayer.alive) allRender[socket.id] = myPlayer;
+
+  for (const id in allRender) {
+    const p = allRender[id];
+    if (!p.alive) continue;
+    const r = radiusOf(p);
+    const col = p.pol === 1 ? p.skin.col1 : p.skin.col2;
+    const isLeader = (id === currentTopLeaderId);
+
+    // Aura spéciale de skin
+    if (p.skin.aura) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r + 14 + Math.sin(Date.now() * 0.006) * 6, 0, Math.PI * 2);
+      if (p.skin.aura === 'gold') ctx.fillStyle = 'rgba(255,209,102,0.18)';
+      else if (p.skin.aura === 'quantum') ctx.fillStyle = 'rgba(67,97,238,0.22)';
+      else if (p.skin.aura === 'fire') ctx.fillStyle = 'rgba(255,72,0,0.25)';
+      else if (p.skin.aura === 'dark') ctx.fillStyle = 'rgba(114,9,183,0.3)';
+      else if (p.skin.aura === 'god') ctx.fillStyle = 'rgba(0,240,255,0.28)';
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // Cercle d'attraction
+    const rangeMultiplier = p.magnetBoostTimer > 0 ? 5.2 : 2.8;
+    ctx.save();
+    ctx.strokeStyle = p.magnetBoostTimer > 0 ? '#00f0ff' : col;
+    ctx.lineWidth = p.magnetBoostTimer > 0 ? 3 : 1.5;
+    ctx.globalAlpha = 0.28;
+    ctx.setLineDash([6, 6]);
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, r * rangeMultiplier, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+
+    // Bouclier d'invincibilité
+    if (p.spawnInvincible > 0) {
+      ctx.save();
+      ctx.strokeStyle = '#ffd166';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r + 8, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Corps de l'aimant
+    ctx.fillStyle = col;
+    ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill();
+
+    // Reflet brillant
+    ctx.fillStyle = 'rgba(255,255,255,0.22)';
+    ctx.beginPath(); ctx.arc(p.x - r * 0.25, p.y - r * 0.25, r * 0.42, 0, Math.PI * 2); ctx.fill();
+
+    // Symbole (+ / -)
+    ctx.fillStyle = isLightColor(col) ? '#111' : '#fff';
+    ctx.font = `900 ${Math.max(16, r * 0.65)}px Arial`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(p.pol === 1 ? '+' : '−', p.x, p.y);
+
+    // Couronne du Leader (Bounty)
+    if (isLeader) {
+      ctx.font = `${Math.max(22, r * 0.45)}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText('👑', p.x, p.y - r - 8);
+    }
+
+    // Nom et Masse
+    ctx.save();
+    ctx.shadowColor = '#000'; ctx.shadowBlur = 6; ctx.shadowOffsetY = 2;
+    ctx.fillStyle = p.isAdmin ? '#c77dff' : (p.isBot ? '#cbd5e1' : '#ffd166');
+    const nameSize = Math.max(12, Math.min(24, r * 0.28));
+    ctx.font = `bold ${nameSize}px sans-serif`;
+    ctx.textBaseline = 'top';
+    ctx.fillText(p.name + (p.isAdmin ? ' [ADMIN]' : (p.isBot ? ' [BOT]' : '')), p.x, p.y + r + 8);
+
+    ctx.fillStyle = '#ffffff';
+    const scoreSize = Math.max(11, Math.min(20, r * 0.24));
+    ctx.font = `bold ${scoreSize}px sans-serif`;
+    ctx.fillText(Math.floor(p.mass), p.x, p.y + r + 10 + nameSize);
+    ctx.restore();
+
+    // Émotes
+    for (const em of activeEmotes) {
+      if (em.playerId === p.id) {
+        ctx.save();
+        const emScale = Math.min(1.4, 0.8 + Math.sin((em.life / em.maxLife) * Math.PI) * 0.4);
+        ctx.font = `${Math.floor(28 * emScale)}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.fillText(em.emote, p.x, p.y - r - 26);
+        ctx.restore();
+      }
+    }
+  }
+
+  // Textes flottants
+  for (const ft of floatingTexts) {
+    ctx.fillStyle = ft.color; ctx.font = 'bold 16px sans-serif';
+    ctx.globalAlpha = Math.max(0, ft.life / ft.maxLife); ctx.textAlign = 'center';
+    ctx.fillText(ft.text, ft.x, ft.y);
+    ctx.globalAlpha = 1;
+  }
+
+  // Particules d'explosion
+  for (const fx of fxList) {
+    ctx.fillStyle = fx.color;
+    ctx.beginPath(); ctx.arc(fx.x, fx.y, fx.size, 0, Math.PI * 2); ctx.fill();
+  }
+
+  ctx.restore();
+
+  // Flèche directionnelle vers le Top 1 (Bounty)
+  if (state === 'play' && myPlayer && myPlayer.alive && currentTopLeaderId && currentTopLeaderId !== socket.id) {
+    const leader = allRender[currentTopLeaderId];
+    if (leader && leader.alive) {
+      const angle = Math.atan2(leader.y - myPlayer.y, leader.x - myPlayer.x);
+      const edgeDist = Math.min(cw, ch) * 0.42;
+      const ax = cw / 2 + Math.cos(angle) * edgeDist;
+      const ay = ch / 2 + Math.sin(angle) * edgeDist;
+
+      ctx.save();
+      ctx.translate(ax, ay);
+      ctx.rotate(angle);
+      ctx.fillStyle = '#ffd166';
+      ctx.beginPath();
+      ctx.moveTo(14, 0); ctx.lineTo(-10, -8); ctx.lineTo(-6, 0); ctx.lineTo(-10, 8);
+      ctx.closePath();
+      ctx.fill();
+      ctx.font = '12px sans-serif';
+      ctx.fillText('👑 PRIME', -18, -14);
+      ctx.restore();
+    }
+  }
+
+  // Minimap
+  if (state === 'play' || state === 'spectate') {
+    mctx.clearRect(0, 0, 140, 140);
+    const ratio = 140 / 3800;
+    
+    if (isBRMode && brState === 'active') {
+      mctx.strokeStyle = '#ff0055';
+      mctx.lineWidth = 1.5;
+      mctx.beginPath();
+      mctx.arc(brZone.x * ratio, brZone.y * ratio, brZone.radius * ratio, 0, Math.PI * 2);
+      mctx.stroke();
+    }
+
+    for (const a of anomalies) {
+      if (!a.alive) continue;
+      mctx.fillStyle = a.type === 'blackhole' ? '#7209b7' : '#00f5d4';
+      mctx.beginPath(); mctx.arc(a.x * ratio, a.y * ratio, 3, 0, Math.PI * 2); mctx.fill();
+    }
+    for (const pw of powerups) {
+      if (!pw.alive) continue;
+      mctx.fillStyle = pw.type === 'speed' ? '#ffd166' : '#00f0ff';
+      mctx.beginPath(); mctx.arc(pw.x * ratio, pw.y * ratio, 2.5, 0, Math.PI * 2); mctx.fill();
+    }
+    for (const id in allRender) {
+      const p = allRender[id];
+      if (!p.alive) continue;
+      mctx.fillStyle = id === socket.id ? '#ffd166' : (id === currentTopLeaderId ? '#ff0055' : (p.isBot ? '#64748b' : '#38bdf8'));
+      mctx.beginPath(); mctx.arc(p.x * ratio, p.y * ratio, id === socket.id ? 4 : 2, 0, Math.PI * 2); mctx.fill();
+    }
+  }
+}
+
+function updateUI() {
+  if (myPlayer && myPlayer.alive) {
+    document.getElementById('scoreVal').textContent = Math.floor(myPlayer.mass);
+    const badge = document.getElementById('polarityBadge');
+    if (myPlayer.cool > 0) {
+      badge.textContent = `RECHARGE (${myPlayer.cool.toFixed(1)}s)`;
+      badge.style.backgroundColor = '#444';
+    } else {
+      const col = myPlayer.pol === 1 ? myPlayer.skin.col1 : myPlayer.skin.col2;
+      badge.textContent = myPlayer.pol === 1 ? '+ POSITIF' : '− NÉGATIF';
+      badge.style.backgroundColor = col;
+    }
+
+    const speedCard = document.getElementById('speedBoostCard');
+    if (myPlayer.speedBoostTimer > 0) {
+      speedCard.style.display = 'flex';
+      document.getElementById('speedBoostTimerTxt').textContent = `${myPlayer.speedBoostTimer.toFixed(1)}s`;
+      document.getElementById('speedBoostBarFill').style.width = `${Math.max(0, Math.min(100, (myPlayer.speedBoostTimer / 4.5) * 100))}%`;
+    } else {
+      speedCard.style.display = 'none';
+    }
+
+    const magnetCard = document.getElementById('magnetBoostCard');
+    if (myPlayer.magnetBoostTimer > 0) {
+      magnetCard.style.display = 'flex';
+      document.getElementById('magnetBoostTimerTxt').textContent = `${myPlayer.magnetBoostTimer.toFixed(1)}s`;
+      document.getElementById('magnetBoostBarFill').style.width = `${Math.max(0, Math.min(100, (myPlayer.magnetBoostTimer / 6.0) * 100))}%`;
+    } else {
+      magnetCard.style.display = 'none';
+    }
+  }
+
+  const allList = { ...players };
+  if (myPlayer) allList[socket.id] = myPlayer;
+  const top10 = Object.values(allList).filter(p => p.alive).sort((a,b) => b.mass - a.mass).slice(0, 10);
+  document.getElementById('boardList').innerHTML = top10.map((p, idx) => `
+    <div class="lb-row ${p.id === socket.id ? 'lb-me' : ''}">
+      <div class="lb-left">
+        <span class="lb-rank ${idx===0 ? 'lb-rank-1' : ''}">${idx === 0 ? '👑' : idx + 1}</span>
+        <span class="lb-name">${p.name}</span>
+      </div>
+      <span class="lb-mass">${Math.floor(p.mass)}</span>
+    </div>
+  `).join('');
+}
+
+// Initialisation
+if (playerProfile.username) document.getElementById('nameInput').value = playerProfile.username;
+updateStatsDisplay();
+renderShop();
+applyHzRate();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
