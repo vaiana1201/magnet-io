@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
+<script src="https://sdk.crazygames.com/crazygames-sdk-v3.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Magnet.io - Édition Complète & Restaurée</title>
@@ -97,6 +98,10 @@
   .btn-secondary:hover { background:rgba(255,255,255,0.18); }
   .btn-copy { background:linear-gradient(90deg, #ffd166, #f77f00); color:#111; font-weight:900; }
   .btn-danger { background:linear-gradient(90deg, #ef476f, #b5179e); color:#fff; }
+  .btn-reward { background:linear-gradient(90deg, #ffd166, #ff8800); color:#111; font-weight:900; box-shadow:0 4px 15px rgba(255,209,102,0.3); }
+  .btn-boost { background:linear-gradient(90deg, #00f0ff, #4cc9f0); color:#05070f; font-weight:900; box-shadow:0 4px 15px rgba(0,240,255,0.35); }
+
+  .ad-banner-container { width:728px; height:90px; margin-top:14px; max-width:95vw; background:rgba(0,0,0,0.25); border-radius:8px; display:flex; align-items:center; justify-content:center; }
 
   #userProfileBanner { display:flex; align-items:center; justify-content:space-between; width:100%; max-width:390px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:12px; padding:8px 16px; margin-bottom:8px; }
 
@@ -263,6 +268,9 @@
     
     <button id="joinCurrentServerBtn" class="btn btn-primary" style="width:100%;">JOUER (<span id="currentServerLabel">GLOBAL</span>) 🚀</button>
     
+    <!-- Bouton Pub Rewarded (+1000 Pièces) -->
+    <button type="button" class="btn btn-reward" style="width:100%;" onclick="watchAdForCoins()">🎁 Regarder une pub (+1000 🪙)</button>
+
     <div style="display:flex; gap:8px; width:100%;">
       <button id="openServerModalBtn" class="btn btn-server" style="flex:1;">MODE / SALON 🌐</button>
       <button id="openSettingsModalBtn" class="btn btn-secondary" style="flex:1;">⚙️ PARAMÈTRES</button>
@@ -275,9 +283,12 @@
 
     <button id="openAccountBtn" class="btn btn-account" style="width:100%;">CONNEXION / COMPTE</button>
   </div>
+
+  <!-- Emplacement Bannière CrazyGames Menu -->
+  <div id="banner-menu" class="ad-banner-container"></div>
 </div>
 
-<!-- MODALE BOUTIQUE (55 SKINS RÉELLEMENT DÉCLARÉS) -->
+<!-- MODALE BOUTIQUE (55 SKINS) -->
 <div id="shopModal" class="modal-overlay">
   <div class="menu-box" style="width:550px; max-width:94%;">
     <h2>BOUTIQUE & PALIERS (55 SKINS)</h2>
@@ -296,7 +307,7 @@
     </div>
 
     <div id="loginView" style="width:100%; display:flex; flex-direction:column; gap:10px;">
-      <p style="font-size:13px; opacity:0.8; margin:0;">Identifiants (Admin : admin / admin)</p>
+      <p style="font-size:13px; opacity:0.8; margin:0;">Identifiants</p>
       <input id="loginUser" placeholder="Pseudo">
       <input id="loginPass" type="password" placeholder="Mot de passe">
       <button id="submitLoginBtn" class="btn btn-account" style="width:100%;">SE CONNECTER 🚀</button>
@@ -410,14 +421,93 @@
       <div style="display:flex; justify-content:space-between; font-size:13px;"><span>Temps survécu :</span><b id="sessionSurvival" style="color:#00f0ff;">0s</b></div>
       <div style="display:flex; justify-content:space-between; font-size:13px;"><span>Gains pièces :</span><b style="color:#ffd166;">+<span id="sessionCoins">0</span> 🪙</b></div>
     </div>
+    
+    <!-- Bouton Respawn Boosté avec Pub -->
+    <button type="button" class="btn btn-boost" style="width:100%;" onclick="watchAdForBoostedRespawn()">⚡ Respawn Boosté (150 Masse)</button>
+    
+    <!-- Bouton Rejouer Normal (Interstitiel 1/3) -->
     <button id="againBtn" class="btn btn-primary" style="width:100%;">REJOUER DIRECT</button>
     <button id="spectateBtn" class="btn btn-friend" style="width:100%;">OBSERVER LA PARTIE 👁️</button>
     <button id="backMenuBtn" class="btn btn-secondary" style="width:100%;">RETOUR AU LOBBY</button>
   </div>
+
+  <!-- Emplacement Bannière CrazyGames Game Over -->
+  <div id="banner-gameover" class="ad-banner-container"></div>
 </div>
 
 <script>
 const socket = io();
+
+// ================= CRAZYGAMES SDK v3 =================
+let crazySDK = null;
+let deathCounter = 0;
+
+window.addEventListener('load', async () => {
+  if (window.CrazyGames && window.CrazyGames.SDK) {
+    try {
+      crazySDK = window.CrazyGames.SDK;
+      await crazySDK.init();
+      console.log("CrazyGames SDK prêt !");
+      showMenuBanner();
+    } catch (e) {
+      console.warn("CrazyGames SDK mode local / offline:", e);
+    }
+  }
+});
+
+function showMenuBanner() {
+  if (crazySDK && crazySDK.banner) {
+    try {
+      crazySDK.banner.requestBanner({ id: 'banner-menu', width: 728, height: 90 });
+    } catch (e) {}
+  }
+}
+
+function showGameOverBanner() {
+  if (crazySDK && crazySDK.banner) {
+    try {
+      crazySDK.banner.requestBanner({ id: 'banner-gameover', width: 728, height: 90 });
+    } catch (e) {}
+  }
+}
+
+function clearAllBanners() {
+  if (crazySDK && crazySDK.banner) {
+    try {
+      crazySDK.banner.clearAllBanners();
+    } catch (e) {}
+  }
+}
+
+function watchAdForCoins() {
+  Sound.init();
+  if (!crazySDK) {
+    playerProfile.coins += 1000;
+    saveProfile();
+    showToast("+1 000 🪙 ajoutés !");
+    return;
+  }
+  crazySDK.ad.requestAd('rewarded', {
+    adFinished: () => {
+      playerProfile.coins += 1000;
+      saveProfile();
+      showToast("Bravo ! +1 000 🪙 ajoutés !");
+    },
+    adError: (err) => console.warn(err)
+  });
+}
+
+function watchAdForBoostedRespawn() {
+  Sound.init();
+  if (!crazySDK) {
+    joinGameWithRoom(selectedServerId, true);
+    return;
+  }
+  crazySDK.ad.requestAd('rewarded', {
+    adFinished: () => joinGameWithRoom(selectedServerId, true),
+    adError: () => joinGameWithRoom(selectedServerId, false)
+  });
+}
 
 // ================= MOTEUR AUDIO COMPLET =================
 const Sound = {
@@ -806,6 +896,7 @@ function returnToLobby() {
   document.getElementById('menu').style.display = 'flex';
   cam.x = 1900; cam.y = 1900; cam.zoom = 0.85;
   updateStatsDisplay();
+  showMenuBanner();
 }
 
 function applyHzRate() {
@@ -976,6 +1067,9 @@ socket.on('adminMassGift', (data) => {
 
 socket.on('youDied', (data) => {
   state = 'dead';
+  if (crazySDK && crazySDK.game) crazySDK.game.gameplayStop();
+  showGameOverBanner();
+
   const finalS = data.mass || (myPlayer ? Math.floor(myPlayer.mass) : 0);
   if (finalS > playerProfile.bestScore) playerProfile.bestScore = finalS;
   const earnedCoins = Math.max(2, Math.floor(finalS * 0.35));
@@ -991,8 +1085,11 @@ socket.on('youDied', (data) => {
   document.getElementById('death').style.display = 'flex';
 });
 
-function joinGameWithRoom(targetRoom) {
+function joinGameWithRoom(targetRoom, hasBoost = false) {
   Sound.init();
+  clearAllBanners();
+  if (crazySDK && crazySDK.game) crazySDK.game.gameplayStart();
+
   sessionStartTime = Date.now();
   const inputName = document.getElementById('nameInput').value.trim();
   const finalName = inputName || playerProfile.username || 'Invité';
@@ -1011,7 +1108,8 @@ function joinGameWithRoom(targetRoom) {
     name: finalName,
     isAdmin: !!playerProfile.isAdmin,
     skin: getActiveSkinData(),
-    roomId: currentRoomId
+    roomId: currentRoomId,
+    hasBoost: hasBoost
   });
 
   state = 'play';
@@ -1030,7 +1128,6 @@ function joinGameWithRoom(targetRoom) {
 }
 
 // ================= MODALES (BOUTIQUE, COMPTE, PARAMÈTRES) =================
-// Boutique
 document.getElementById('openShopBtn').onclick = () => {
   renderShop();
   document.getElementById('shopModal').style.display = 'flex';
@@ -1039,7 +1136,6 @@ document.getElementById('closeShopBtn').onclick = () => {
   document.getElementById('shopModal').style.display = 'none';
 };
 
-// Compte
 document.getElementById('openAccountBtn').onclick = () => {
   document.getElementById('accountModal').style.display = 'flex';
 };
@@ -1117,7 +1213,6 @@ document.getElementById('submitRegisterBtn').onclick = () => {
   showToast("Compte créé avec succès ! +250 🪙");
 };
 
-// Paramètres
 function openSettings() {
   Sound.init();
   document.getElementById('volMaster').value = Sound.volMaster;
@@ -1151,7 +1246,6 @@ document.getElementById('testPowerup').onclick = () => Sound.playPowerup(1);
 document.getElementById('testKill').onclick = () => Sound.playKill(1);
 document.getElementById('testWin').onclick = () => Sound.playWinFanfare(1);
 
-// Modes et Salons
 document.getElementById('openServerModalBtn').onclick = () => { document.getElementById('serverModal').style.display = 'flex'; };
 document.getElementById('closeServerModalBtn').onclick = () => { document.getElementById('serverModal').style.display = 'none'; };
 document.querySelectorAll('.server-preset-btn').forEach(b => {
@@ -1172,7 +1266,7 @@ document.getElementById('createRoomBtn').onclick = () => {
 };
 document.getElementById('joinRoomBtn').onclick = () => {
   const r = document.getElementById('roomInput').value.trim() || 'GLOBAL';
-  joinGameWithRoom(r);
+  joinGameWithRoom(r, false);
 };
 
 // ================= CONTRÔLES DU JEU =================
@@ -1192,10 +1286,24 @@ canvas.addEventListener('mousedown', e => {
 });
 canvas.addEventListener('contextmenu', e => e.preventDefault());
 
-document.getElementById('joinCurrentServerBtn').onclick = () => joinGameWithRoom(selectedServerId);
+document.getElementById('joinCurrentServerBtn').onclick = () => joinGameWithRoom(selectedServerId, false);
 document.getElementById('quitToLobbyBtn').onclick = returnToLobby;
 document.getElementById('backMenuBtn').onclick = returnToLobby;
-document.getElementById('againBtn').onclick = () => joinGameWithRoom(selectedServerId);
+
+// Bouton Rejouer avec pub interstitielle (1/3)
+document.getElementById('againBtn').onclick = () => {
+  deathCounter++;
+  if (crazySDK && deathCounter >= 3) {
+    deathCounter = 0;
+    crazySDK.ad.requestAd('midgame', {
+      adFinished: () => joinGameWithRoom(selectedServerId, false),
+      adError: () => joinGameWithRoom(selectedServerId, false)
+    });
+  } else {
+    joinGameWithRoom(selectedServerId, false);
+  }
+};
+
 document.getElementById('closeBrWinModalBtn').onclick = returnToLobby;
 
 // Console Admin
@@ -1228,7 +1336,7 @@ document.getElementById('specNextBtn').onclick = () => {
   document.getElementById('specPlayerName').textContent = nextTarget.name;
 };
 document.getElementById('specLeaveBtn').onclick = returnToLobby;
-document.getElementById('specRespawnBtn').onclick = () => joinGameWithRoom(selectedServerId);
+document.getElementById('specRespawnBtn').onclick = () => joinGameWithRoom(selectedServerId, false);
 
 // Roue d'émotes
 const emoteWheel = document.getElementById('emoteWheel');
