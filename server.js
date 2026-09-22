@@ -18,8 +18,7 @@ let db = { users: {} };
 function loadDatabase() {
   try {
     if (fs.existsSync(DB_FILE)) {
-      const raw = fs.readFileSync(DB_FILE, 'utf8');
-      db = JSON.parse(raw);
+      db = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
     } else {
       saveDatabase();
     }
@@ -57,11 +56,11 @@ function speedOf(p) {
 
 function initRoomData(roomId, isBR = false) {
   const parts = [];
-  for (let i = 0; i < 450; i++) {
+  for (let i = 0; i < 220; i++) {
     parts.push({
       id: 'p_' + i,
-      x: Math.random() * (W - 200) + 100,
-      y: Math.random() * (H - 200) + 100,
+      x: Math.round(Math.random() * (W - 200) + 100),
+      y: Math.round(Math.random() * (H - 200) + 100),
       vx: 0, vy: 0,
       pol: Math.random() < 0.5 ? 1 : -1
     });
@@ -74,11 +73,11 @@ function initRoomData(roomId, isBR = false) {
   ];
 
   const powerups = [];
-  for (let i = 0; i < 20; i++) {
+  for (let i = 0; i < 16; i++) {
     powerups.push({
       id: 'pw_' + i,
-      x: Math.random() * (W - 400) + 200,
-      y: Math.random() * (H - 400) + 200,
+      x: Math.round(Math.random() * (W - 400) + 200),
+      y: Math.round(Math.random() * (H - 400) + 200),
       type: Math.random() < 0.5 ? 'speed' : 'magnet',
       alive: true
     });
@@ -141,7 +140,7 @@ function findOrCreateDynamicRoom(requested) {
 
 function getSafeSpawn(room) {
   const allEnts = [...Object.values(room.players), ...Object.values(room.bots)].filter(e => e.alive);
-  for (let attempts = 0; attempts < 40; attempts++) {
+  for (let attempts = 0; attempts < 30; attempts++) {
     const sx = Math.random() * (W - 800) + 400;
     const sy = Math.random() * (H - 800) + 400;
     let safe = true;
@@ -155,9 +154,9 @@ function getSafeSpawn(room) {
       if (Math.hypot(sx - e.x, sy - e.y) < radiusOf(e) + 400) { safe = false; break; }
     }
 
-    if (safe) return { x: sx, y: sy };
+    if (safe) return { x: Math.round(sx), y: Math.round(sy) };
   }
-  return { x: Math.random() * (W - 800) + 400, y: Math.random() * (H - 800) + 400 };
+  return { x: Math.round(Math.random() * (W - 800) + 400), y: Math.round(Math.random() * (H - 800) + 400) };
 }
 
 function createBot(room, name) {
@@ -180,7 +179,7 @@ function createBot(room, name) {
     magnetBoostTimer: 0,
     spawnInvincible: 5.0,
     blackHoleTime: 0,
-    aiTimer: 0.2,
+    aiTimer: 0.25,
     skill: 0.65 + Math.random() * 0.25,
     alive: true
   };
@@ -311,7 +310,7 @@ io.on('connection', (socket) => {
       const d = Math.hypot(dx, dy) || 1;
       p.vx = (dx / d) * (speedOf(p) + 750);
       p.vy = (dy / d) * (speedOf(p) + 750);
-      io.to(currentRoomId).emit('playerDashed', { id: socket.id, x: p.x, y: p.y });
+      io.to(currentRoomId).emit('playerDashed', { id: socket.id, x: Math.round(p.x), y: Math.round(p.y) });
     }
   });
 
@@ -326,13 +325,13 @@ io.on('connection', (socket) => {
       const r = radiusOf(p);
       room.parts.push({
         id: 'feed_' + Math.random().toString(36).substr(2, 8),
-        x: p.x + (dx / d) * (r + 20),
-        y: p.y + (dy / d) * (r + 20),
+        x: Math.round(p.x + (dx / d) * (r + 20)),
+        y: Math.round(p.y + (dy / d) * (r + 20)),
         vx: (dx / d) * 350,
         vy: (dy / d) * 350,
         pol: p.pol
       });
-      io.to(currentRoomId).emit('massEjected', { x: p.x, y: p.y });
+      io.to(currentRoomId).emit('massEjected', { x: Math.round(p.x), y: Math.round(p.y) });
     }
   });
 
@@ -349,7 +348,7 @@ io.on('connection', (socket) => {
     const p = rooms[currentRoomId].players[socket.id];
     if (p && p.alive && p.isAdmin) {
       p.mass = Math.max(20, p.mass + (data.amount || 500));
-      io.to(currentRoomId).emit('adminMassGift', { id: p.id, mass: p.mass, added: data.amount });
+      io.to(currentRoomId).emit('adminMassGift', { id: p.id, mass: Math.round(p.mass), added: data.amount });
     }
   });
 
@@ -373,7 +372,7 @@ io.on('connection', (socket) => {
 function updateBotAI(b, room, dt) {
   b.aiTimer -= dt;
   if (b.aiTimer > 0) return;
-  b.aiTimer = 0.2 + (1 - b.skill) * 0.25;
+  b.aiTimer = 0.25 + (1 - b.skill) * 0.25;
 
   const allEnts = [...Object.values(room.players), ...Object.values(room.bots)].filter(e => e.alive);
   let threat = null, minTD = 550;
@@ -408,7 +407,7 @@ function updateBotAI(b, room, dt) {
       b.dashActiveTimer = 0.35;
       b.vx = (dx / d) * (speedOf(b) + 750);
       b.vy = (dy / d) * (speedOf(b) + 750);
-      io.to(room.id).emit('playerDashed', { id: b.id, x: b.x, y: b.y });
+      io.to(room.id).emit('playerDashed', { id: b.id, x: Math.round(b.x), y: Math.round(b.y) });
     }
   } else if (prey) {
     b.tx = prey.x; b.ty = prey.y;
@@ -416,7 +415,7 @@ function updateBotAI(b, room, dt) {
       b.pol = -b.pol; b.cool = 5.0;
     }
   } else {
-    let closestP = null, minD = 400;
+    let closestP = null, minD = 350;
     for (const p of room.parts) {
       if (p.pol === b.pol) {
         const d = Math.hypot(p.x - b.x, p.y - b.y);
@@ -433,7 +432,8 @@ function updateBotAI(b, room, dt) {
   if (b.y > H - pad) b.ty = b.y - 350;
 }
 
-const SERVER_TICKRATE = 60;
+// ================= TICKRATE SERVEUR À 30 HZ =================
+const SERVER_TICKRATE = 30;
 const dt = 1 / SERVER_TICKRATE;
 
 setInterval(() => {
@@ -527,8 +527,8 @@ setInterval(() => {
             if (!e.isBot) io.to(e.id).emit('boostPicked', { type: 'magnet', text: '🧲 HYPER AIMANT (6s) !' });
           }
           setTimeout(() => {
-            pw.x = Math.random() * (W - 400) + 200;
-            pw.y = Math.random() * (H - 400) + 200;
+            pw.x = Math.round(Math.random() * (W - 400) + 200);
+            pw.y = Math.round(Math.random() * (H - 400) + 200);
             pw.alive = true;
           }, 10000);
         }
@@ -542,7 +542,7 @@ setInterval(() => {
         if (r >= a.radius * 1.5 && d < r) {
           a.alive = false;
           e.mass += 1000;
-          io.to(room.id).emit('anomalyEaten', { anomId: a.id, eaterId: e.id, eaterName: e.name, type: a.type, x: a.x, y: a.y });
+          io.to(room.id).emit('anomalyEaten', { anomId: a.id, eaterId: e.id, eaterName: e.name, type: a.type, x: Math.round(a.x), y: Math.round(a.y) });
           setTimeout(() => {
             const newPos = getSafeAnomalySpawn(room);
             a.x = newPos.x; a.y = newPos.y; a.alive = true;
@@ -567,7 +567,7 @@ setInterval(() => {
             if (e.blackHoleTime >= 5.0) {
               e.blackHoleTime = 0;
               e.mass -= Math.max(2, e.mass * 0.10);
-              io.to(room.id).emit('blackHoleZap', { id: e.id, x: e.x, y: e.y });
+              io.to(room.id).emit('blackHoleZap', { id: e.id, x: Math.round(e.x), y: Math.round(e.y) });
               if (e.mass < 10) {
                 e.alive = false;
                 if (!e.isBot) io.to(e.id).emit('youDied', { killer: 'le Trou Noir', mass: Math.floor(e.mass) });
@@ -631,12 +631,12 @@ setInterval(() => {
           if (part.id && part.id.toString().startsWith('feed_')) {
             room.parts.splice(k, 1);
           } else {
-            part.x = Math.random() * (W - 200) + 100;
-            part.y = Math.random() * (H - 200) + 100;
+            part.x = Math.round(Math.random() * (W - 200) + 100);
+            part.y = Math.round(Math.random() * (H - 200) + 100);
             part.vx = 0; part.vy = 0;
             part.pol = Math.random() < 0.5 ? 1 : -1;
           }
-          if (!e.isBot) io.to(e.id).emit('eatOrb', { x: e.x, y: e.y });
+          if (!e.isBot) io.to(e.id).emit('eatOrb', { x: Math.round(e.x), y: Math.round(e.y) });
         }
       }
     }
@@ -664,7 +664,7 @@ setInterval(() => {
           a.vy -= uy * bounceForce;
           b.vx += ux * bounceForce;
           b.vy += uy * bounceForce;
-          io.to(room.id).emit('magnetBounce', { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+          io.to(room.id).emit('magnetBounce', { x: Math.round((a.x + b.x) / 2), y: Math.round((a.y + b.y) / 2) });
           continue;
         }
 
@@ -693,8 +693,8 @@ setInterval(() => {
             io.to(room.id).emit('playerKilled', {
               deadId: small.id,
               killerId: big.id,
-              x: small.x,
-              y: small.y,
+              x: Math.round(small.x),
+              y: Math.round(small.y),
               radius: radiusOf(small),
               wasLeader: wasLeaderBounty
             });
@@ -709,16 +709,25 @@ setInterval(() => {
       }
     }
 
-    const combinedEntities = { ...room.players, ...room.bots };
+    const optimizedPlayers = {};
+    for (const id in room.players) {
+      const p = room.players[id];
+      optimizedPlayers[id] = { ...p, x: Math.round(p.x), y: Math.round(p.y), mass: Math.round(p.mass) };
+    }
+    for (const id in room.bots) {
+      const b = room.bots[id];
+      optimizedPlayers[id] = { ...b, x: Math.round(b.x), y: Math.round(b.y), mass: Math.round(b.mass) };
+    }
+
     io.to(room.id).emit('stateUpdate', {
       roomId: room.id,
       isBR: room.isBR,
       brState: room.brState,
       brTimer: room.brTimer,
-      brZoneRadius: room.brZoneRadius,
-      brZoneX: room.brZoneX,
-      brZoneY: room.brZoneY,
-      players: combinedEntities,
+      brZoneRadius: Math.round(room.brZoneRadius),
+      brZoneX: Math.round(room.brZoneX),
+      brZoneY: Math.round(room.brZoneY),
+      players: optimizedPlayers,
       parts: room.parts,
       anomalies: room.anomalies,
       powerups: room.powerups,
@@ -729,5 +738,5 @@ setInterval(() => {
 
 const PORT = process.env.PORT || 3000;
 http.listen(PORT, '0.0.0.0', () => {
-  console.log(`Serveur Magnet.io prêt sur http://localhost:${PORT}`);
+  console.log(`Serveur Magnet.io prêt sur le port ${PORT} (30Hz Eco-Cloud)`);
 });
