@@ -56,7 +56,7 @@ function speedOf(p) {
 
 function initRoomData(roomId, isBR = false) {
   const parts = [];
-  for (let i = 0; i < 220; i++) {
+  for (let i = 0; i < 440; i++) {
     parts.push({
       id: 'p_' + i,
       x: Math.round(Math.random() * (W - 200) + 100),
@@ -73,7 +73,7 @@ function initRoomData(roomId, isBR = false) {
   ];
 
   const powerups = [];
-  for (let i = 0; i < 16; i++) {
+  for (let i = 0; i < 20; i++) {
     powerups.push({
       id: 'pw_' + i,
       x: Math.round(Math.random() * (W - 400) + 200),
@@ -192,13 +192,12 @@ io.on('connection', (socket) => {
   socket.on('accountRegister', (data) => {
     const u = data.username ? data.username.trim() : '';
     const p = data.password ? data.password.trim() : '';
-    if (!u || !p) return socket.emit('accountError', "Identifiants invalides.");
+    if (!u) return socket.emit('accountError', "Veuillez entrer un pseudo.");
     if (db.users[u.toLowerCase()]) return socket.emit('accountError', "Ce pseudo est déjà pris.");
 
     db.users[u.toLowerCase()] = {
       username: u,
       password: p,
-      isAdmin: (u.toLowerCase() === 'admin' && p === 'admin'),
       coins: 250,
       level: 1,
       xp: 0,
@@ -214,6 +213,7 @@ io.on('connection', (socket) => {
   socket.on('accountLogin', (data) => {
     const u = data.username ? data.username.trim().toLowerCase() : '';
     const p = data.password ? data.password.trim() : '';
+
     const acc = db.users[u];
     if (acc && acc.password === p) {
       userAccount = acc;
@@ -252,13 +252,12 @@ io.on('connection', (socket) => {
     room.players[socket.id] = {
       id: socket.id,
       name: data.name || 'Pilote',
-      isAdmin: !!data.isAdmin,
       isBot: false,
       skin: data.skin || SKINS_DEFAULTS[0],
       x: spawn.x, y: spawn.y,
       vx: 0, vy: 0,
       tx: spawn.x, ty: spawn.y,
-      mass: data.isAdmin ? 2500 : 24,
+      mass: 24,
       pol: 1,
       cool: 0,
       dashCooldown: 0,
@@ -272,8 +271,7 @@ io.on('connection', (socket) => {
 
     socket.emit('joinedRoom', {
       roomId: currentRoomId,
-      isBR: room.isBR,
-      isAdmin: !!data.isAdmin
+      isBR: room.isBR
     });
   });
 
@@ -340,25 +338,6 @@ io.on('connection', (socket) => {
     const p = rooms[currentRoomId].players[socket.id];
     if (p && p.alive) {
       io.to(currentRoomId).emit('playerEmoted', { id: p.id, emote: data.emote });
-    }
-  });
-
-  socket.on('adminGiveMass', (data) => {
-    if (!currentRoomId || !rooms[currentRoomId]) return;
-    const p = rooms[currentRoomId].players[socket.id];
-    if (p && p.alive && p.isAdmin) {
-      p.mass = Math.max(20, p.mass + (data.amount || 500));
-      io.to(currentRoomId).emit('adminMassGift', { id: p.id, mass: Math.round(p.mass), added: data.amount });
-    }
-  });
-
-  socket.on('adminTriggerFourCorners', () => {
-    if (!currentRoomId || !rooms[currentRoomId]) return;
-    const p = rooms[currentRoomId].players[socket.id];
-    if (p && p.alive && p.isAdmin) {
-      p.x = W / 2; p.y = H / 2;
-      p.mass = 660000;
-      p.vx = 0; p.vy = 0;
     }
   });
 
@@ -432,7 +411,6 @@ function updateBotAI(b, room, dt) {
   if (b.y > H - pad) b.ty = b.y - 350;
 }
 
-// ================= TICKRATE SERVEUR À 30 HZ =================
 const SERVER_TICKRATE = 30;
 const dt = 1 / SERVER_TICKRATE;
 
@@ -544,8 +522,9 @@ setInterval(() => {
           e.mass += 1000;
           io.to(room.id).emit('anomalyEaten', { anomId: a.id, eaterId: e.id, eaterName: e.name, type: a.type, x: Math.round(a.x), y: Math.round(a.y) });
           setTimeout(() => {
-            const newPos = getSafeAnomalySpawn(room);
-            a.x = newPos.x; a.y = newPos.y; a.alive = true;
+            a.x = Math.random() * (W - 800) + 400;
+            a.y = Math.random() * (H - 800) + 400;
+            a.alive = true;
           }, 12000);
           continue;
         }
@@ -738,5 +717,5 @@ setInterval(() => {
 
 const PORT = process.env.PORT || 3000;
 http.listen(PORT, '0.0.0.0', () => {
-  console.log(`Serveur Magnet.io prêt sur le port ${PORT} (30Hz Eco-Cloud)`);
+  console.log(`Serveur Magnet.io prêt sur http://localhost:${PORT}`);
 });
